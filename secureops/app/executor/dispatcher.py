@@ -52,6 +52,7 @@ class ExecutionDispatcher:
         tool_input: Dict[str, Any],
         approval_id: Optional[str] = None,
         idempotency_key: Optional[str] = None,
+        tenant_id: str = "tenant_default",
     ) -> Dict[str, Any]:
         start_time = time.time()
         execution_id = f"exec_{uuid.uuid4().hex[:12]}"
@@ -84,7 +85,8 @@ class ExecutionDispatcher:
         )
 
         # 6. Validate Tool Input against Pydantic schema (extra="forbid", path traversal, command injection)
-        clean_tool_input = {k: v for k, v in tool_input.items() if k != "intent"}
+        # Strip client-supplied security fields ('intent', 'tenant_id') to enforce server-side authority
+        clean_tool_input = {k: v for k, v in tool_input.items() if k not in ["intent", "tenant_id"]}
         try:
             validated_inputs = tool_def.input_schema(**clean_tool_input)
         except Exception as exc:
@@ -95,8 +97,15 @@ class ExecutionDispatcher:
 
         # 7. Execute Tool Handler with Timeout Control
         try:
+            import inspect
+            sig = inspect.signature(tool_def.handler)
+            if "tenant_id" in sig.parameters:
+                coro = tool_def.handler(validated_inputs, tenant_id=tenant_id)
+            else:
+                coro = tool_def.handler(validated_inputs)
+
             result = await asyncio.wait_for(
-                tool_def.handler(validated_inputs),
+                coro,
                 timeout=settings.EXECUTION_TIMEOUT_SECONDS,
             )
         except asyncio.TimeoutError:

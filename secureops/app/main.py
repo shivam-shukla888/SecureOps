@@ -39,15 +39,50 @@ from app.audit.siem import siem_manager
 from app.approval.manager import approval_manager
 from app.approval.repository import in_memory_approval_repo
 from app.n8n.webhook import n8n_webhook_client
+from app.tools.integrations.document_service import document_service_adapter, DocumentSearchRequest
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    """Validates configuration presence and logs sanitized startup status."""
+    print("===============================================================================")
+    print("                    SECUREOPS ENTERPRISE GATEWAY STARTUP                       ")
+    print("===============================================================================")
+    print(f"  ENVIRONMENT            : {settings.ENVIRONMENT}")
+    print(f"  LOG_LEVEL              : {settings.LOG_LEVEL}")
+    print(f"  API_KEY                : {'CONFIGURED' if settings.API_KEY else 'MISSING'}")
+    print(f"  GEMINI_API_KEY         : {'CONFIGURED' if settings.GEMINI_API_KEY else 'MISSING'}")
+    print(f"  GEMINI_MODEL           : {'CONFIGURED' if settings.GEMINI_MODEL else 'MISSING'}")
+    print(f"  GROQ_API_KEY           : {'CONFIGURED' if settings.GROQ_API_KEY else 'MISSING'}")
+    print(f"  GROQ_MODEL             : {'CONFIGURED' if settings.GROQ_MODEL else 'MISSING'}")
+    print(f"  RATE_LIMIT_BACKEND     : {settings.RATE_LIMIT_BACKEND}")
+    print(f"  DATABASE_URL           : {'CONFIGURED' if settings.DATABASE_URL else 'MISSING'}")
+    print(f"  N8N_APPROVAL_WEBHOOK   : {'CONFIGURED' if settings.N8N_APPROVAL_WEBHOOK_URL else 'MISSING'}")
+    print("===============================================================================\n")
+    yield
+
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="SecureOps Gateway API",
     description="Enterprise Multi-Tenant AI Gateway, Deterministic Policy Engine, Hashed Credential Manager & Secure Executor",
     version="5.0.0",
+    lifespan=lifespan,
+)
+
+# Enable CORS Middleware for Frontend Dashboard Integration & OPTIONS Preflight
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Add Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
+
 
 
 # Exception Handlers for Unified JSON Error Output
@@ -216,8 +251,17 @@ async def process_request(
             expires_at=expires_at_str,
         )
 
-    # Dispatch Execution (Simulated)
-    execution_result = ExecutionDispatcher.dispatch(policy_decision)
+    # Dispatch Execution (Real Tool Integration for SEARCH_DOCUMENT)
+    if policy_decision.decision == DecisionEnum.ALLOW and policy_decision.intent == IntentEnum.SEARCH_DOCUMENT:
+        search_query = secure_req.request if ("architecture" in secure_req.request.lower() or "search" in secure_req.request.lower()) else (policy_decision.resource or secure_req.request)
+        search_req = DocumentSearchRequest(
+            query=search_query,
+            tenant_id=ctx.tenant_id,
+        )
+        execution_result = await document_service_adapter.search_documents(search_req)
+    else:
+        execution_result = ExecutionDispatcher.dispatch(policy_decision)
+
     if approval_id:
         execution_result["approval_id"] = approval_id
         execution_result["expires_at"] = expires_at_str
@@ -308,6 +352,7 @@ async def execute_tool_endpoint(
             tool_input=execution_req.tool_input,
             approval_id=execution_req.approval_id,
             idempotency_key=idempotency_key,
+            tenant_id=ctx.tenant_id,
         )
         metrics_tracker.record_execution(success=True)
     except Exception as exc:
@@ -464,6 +509,21 @@ async def list_audit_events(
         decision=decision,
         limit=limit,
     )
+    return {
+        "tenant_id": ctx.tenant_id,
+        "count": len(events),
+        "events": events,
+    }
+
+
+@app.get("/v1/security/events", tags=["Audit & Governance"])
+async def list_security_events(
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=500),
+    api_key: str = Depends(verify_api_key),
+    ctx: TenantUserContext = Depends(require_role([RoleEnum.VIEWER, RoleEnum.OPERATOR, RoleEnum.APPROVER, RoleEnum.ADMIN, RoleEnum.OWNER])),
+):
+    events = siem_manager.list_tenant_security_events(tenant_id=ctx.tenant_id, limit=limit)
     return {
         "tenant_id": ctx.tenant_id,
         "count": len(events),

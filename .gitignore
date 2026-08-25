@@ -12,10 +12,16 @@ venv/
 ENV/
 env/
 .env
+secureops/.env
+frontend/.env
 
-# Logs & Temporary Artifacts
-*.log
+# Node & Frontend
+node_modules/
 dist/
 build/
-*.egg-info/
+.npm
+
+# Logs & Temporary Scratch Files
+*.log
+scratch/
 .DS_Store

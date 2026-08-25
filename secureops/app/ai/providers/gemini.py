@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(BaseAIProvider):
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or settings.GEMINI_API_KEY
-        self.model = "gemini-2.5-flash"
+        self.model = model or settings.GEMINI_MODEL
 
     async def classify_request(self, user_request: str) -> ClassifierResult:
         if not self.api_key:

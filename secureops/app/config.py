@@ -12,10 +12,13 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # AI Provider API Keys & Models
+    PRIMARY_API_KEY: str = "sk-c0b078f9cca6d3da-3af242-0bb15fcc"
+    PRIMARY_MODEL: str = "gpt-4o-mini"
+    PRIMARY_BASE_URL: str = "https://api.openai.com/v1"
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-3.5-flash"
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-20b"
 
     # Rate Limiting Configuration
     RATE_LIMIT_PER_MINUTE: int = 60

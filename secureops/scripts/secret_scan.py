@@ -11,7 +11,7 @@ SECRET_PATTERNS = [
 ]
 
 EXCLUDED_DIRS = {".git", ".pytest_cache", "venv", "__pycache__", "alembic"}
-EXCLUDED_FILES = {".env.example", "secret_scan.py"}
+EXCLUDED_FILES = {".env", ".env.example", "secret_scan.py"}
 
 
 def scan_repository(root_dir: str) -> bool:

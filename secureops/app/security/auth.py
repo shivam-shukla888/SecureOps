@@ -8,28 +8,40 @@ from app.security.credentials import credential_repo
 from app.security.rbac import TenantUserContext, RoleEnum
 
 logger = logging.getLogger(__name__)
-security_bearer = HTTPBearer(auto_error=False)
+security_bearer = HTTPBearer(
+    auto_error=False,
+    scheme_name="HTTPBearer",
+    description="Enter your API Key value (e.g. secops_live_...). Do NOT include the 'Bearer ' prefix.",
+)
 
 
 async def verify_api_key(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Security(security_bearer),
 ) -> str:
-    if not credentials or not credentials.credentials:
-        logger.warning("Authentication failed: Missing Bearer token in request headers.")
+    raw_header = request.headers.get("Authorization") or request.headers.get("authorization")
+
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    elif raw_header:
+        token = raw_header
+
+    if not token:
+        logger.warning("Authentication failed: Missing Authorization header.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing Authorization header",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    raw_token = credentials.credentials.strip()
-
-    # Look up hashed credential record
-    cred_record = credential_repo.get_by_raw_key(raw_token)
+    # Look up hashed credential record via token
+    cred_record = credential_repo.get_by_raw_key(token)
 
     if not cred_record:
-        logger.warning("Authentication failed: Invalid or revoked API key.")
+        logger.warning(
+            f"Authentication failed: Invalid or unauthorized API key (Token Length={len(token.strip())}, Scheme={'Bearer' if credentials else 'RawHeader'})."
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or unauthorized API key",
@@ -44,4 +56,4 @@ async def verify_api_key(
         credential_id=cred_record.credential_id,
     )
 
-    return raw_token
+    return token.strip()

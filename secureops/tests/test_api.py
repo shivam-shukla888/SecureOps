@@ -168,3 +168,15 @@ def test_api_ai_failure_fails_closed(client, auth_headers):
         assert data["policy_risk"] == "HIGH"
         assert data["provider_used"] == "none"
         assert data["fallback_used"] is True
+
+
+def test_cors_preflight_options_success(client):
+    headers = {
+        "Origin": "http://localhost:3000",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization, content-type",
+    }
+    response = client.options("/v1/dashboard/summary", headers=headers)
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") in ["*", "http://localhost:3000"]
+    assert "authorization" in response.headers.get("access-control-allow-headers", "").lower()

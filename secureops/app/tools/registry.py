@@ -16,19 +16,11 @@ from app.security.network import ssrf_protector
 logger = logging.getLogger(__name__)
 
 
-# Safe Mock Tool Handlers
-async def handle_search_document(inputs: SearchDocumentInput) -> Dict[str, Any]:
-    token = secret_provider.get_secret("DOCUMENT_SERVICE_TOKEN")
-    return {
-        "status": "executed",
-        "tool": "search_document",
-        "query": inputs.query,
-        "document_id": inputs.document_id,
-        "results": [
-            {"id": "doc_101", "title": f"Result for '{inputs.query}'", "snippet": "Sample secure document content..."}
-        ],
-        "authenticated_via_secret": bool(token),
-    }
+# Real Document Search Tool Handler
+async def handle_search_document(inputs: SearchDocumentInput, tenant_id: str = "tenant_default") -> Dict[str, Any]:
+    from app.tools.integrations.document_service import document_service_adapter, DocumentSearchRequest
+    search_req = DocumentSearchRequest(query=inputs.query, tenant_id=tenant_id)
+    return await document_service_adapter.search_documents(search_req)
 
 
 async def handle_read_data(inputs: ReadDataInput) -> Dict[str, Any]:
