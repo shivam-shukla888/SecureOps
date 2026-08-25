@@ -1,0 +1,163 @@
+{
+  "name": "Secure Executor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "secure-executor",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c87728f1-e0da-4aa2-95a8-10dac3fe2e0f",
+      "name": "Webhook",
+      "webhookId": "99541020-af0d-4579-84ed-06824b7fa521"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\n\nconst request = body.request ?? body;\n\nconst allowedIntents = [\n  \"SEARCH_DOCUMENT\"\n];\n\nconst intent = request.intent;\nconst risk = request.risk;\nconst requiresApproval = request.requires_approval;\n\nconst valid =\n  allowedIntents.includes(intent) &&\n  risk === \"LOW\" &&\n  requiresApproval === false;\n\nreturn [\n  {\n    json: {\n      allowed: valid,\n      intent,\n      risk,\n      requires_approval: requiresApproval,\n      request\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "1d5e4f97-6d15-4517-9408-9c22e66a821a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1595e4b2-f1d0-4732-a8c7-227ec3255728",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "6066264c-3c04-4b0e-b6a2-7e97712d94ac",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://alphhha.app.n8n.cloud/webhook/secureops/request",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        -96
+      ],
+      "id": "2149e70d-65fc-4f69-b9b8-eada01749af2",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"blocked\",\n  \"message\": \"Request rejected by Secure Executor\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        96
+      ],
+      "id": "60b9d501-8b34-4ba5-ae45-38d740a69ed6",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "8c98a2ff-42bc-41db-a3d8-4eeb1520fe73",
+  "meta": {
+    "instanceId": "600dd561f12c2ba392734d263450f72f89326b633f95e1fd6bf968f3f5f8a4b7"
+  },
+  "nodeGroups": [],
+  "id": "15ynZW8KuNs969V5",
+  "tags": []
+}

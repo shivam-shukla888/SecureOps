@@ -1,0 +1,21 @@
+# Python Bytecode & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environments & Local Secrets
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Logs & Temporary Artifacts
+*.log
+dist/
+build/
+*.egg-info/
+.DS_Store
