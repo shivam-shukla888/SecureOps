@@ -1,7 +1,7 @@
 import hashlib
 import secrets
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
 from typing import Dict, Optional, List
 from fastapi import HTTPException, status
@@ -80,7 +80,7 @@ class APICredentialRepository:
             self.credentials[env_rec.credential_id] = env_rec
             self.hash_index[env_hash] = env_rec.credential_id
 
-    def get_by_raw_key(self, raw_key: str) -> Optional[APICredentialRecord]:
+    async def get_by_raw_key(self, raw_key: str) -> Optional[APICredentialRecord]:
         if not raw_key:
             return None
 
@@ -128,6 +128,38 @@ class APICredentialRepository:
                 self.hash_index[t_hash] = t_rec.credential_id
                 cred_id = t_rec.credential_id
 
+        # Database lookup if miss in memory index
+        if not cred_id:
+            try:
+                from app.db.session import async_session_factory
+                from app.db.models import APICredentialModel
+                from sqlalchemy import select
+
+                async with async_session_factory() as session:
+                    stmt = select(APICredentialModel).where(APICredentialModel.key_hash == k_hash)
+                    res = await session.execute(stmt)
+                    db_cred = res.scalar_one_or_none()
+
+                    if db_cred:
+                        role_enum = RoleEnum(db_cred.role) if db_cred.role in [r.value for r in RoleEnum] else RoleEnum.OPERATOR
+                        rec = APICredentialRecord(
+                            credential_id=db_cred.credential_id,
+                            tenant_id=db_cred.tenant_id,
+                            user_id=db_cred.user_id,
+                            name=db_cred.name,
+                            key_hash=db_cred.key_hash,
+                            role=role_enum,
+                            created_at=db_cred.created_at or datetime.now(timezone.utc),
+                            expires_at=db_cred.expires_at,
+                            revoked_at=db_cred.revoked_at,
+                            last_used_at=db_cred.last_used_at,
+                        )
+                        self.credentials[rec.credential_id] = rec
+                        self.hash_index[rec.key_hash] = rec.credential_id
+                        cred_id = rec.credential_id
+            except Exception as exc:
+                logger.debug(f"PostgreSQL credential read skipped/failed ({exc})")
+
         if not cred_id:
             return None
 
@@ -137,7 +169,7 @@ class APICredentialRepository:
             return cred
         return None
 
-    def create_credential(
+    async def create_credential(
         self,
         tenant_id: str,
         user_id: str,
@@ -166,9 +198,30 @@ class APICredentialRepository:
 
         self.credentials[cred_id] = record
         self.hash_index[k_hash] = cred_id
+
+        # Persist into PostgreSQL
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import APICredentialModel
+            async with async_session_factory() as session:
+                db_model = APICredentialModel(
+                    credential_id=cred_id,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    name=name,
+                    key_hash=k_hash,
+                    role=role.value if hasattr(role, "value") else str(role),
+                    created_at=record.created_at,
+                    expires_at=expires_at,
+                )
+                session.add(db_model)
+                await session.commit()
+        except Exception as exc:
+            logger.debug(f"PostgreSQL credential save skipped/failed ({exc})")
+
         return raw_key, record
 
-    def revoke_credential(self, credential_id: str, tenant_id: str) -> APICredentialRecord:
+    async def revoke_credential(self, credential_id: str, tenant_id: str) -> APICredentialRecord:
         cred = self.credentials.get(credential_id)
         if not cred or cred.tenant_id != tenant_id:
             raise HTTPException(
@@ -176,18 +229,63 @@ class APICredentialRepository:
                 detail=f"Credential '{credential_id}' not found in tenant '{tenant_id}'."
             )
         cred.revoked_at = datetime.now(timezone.utc)
+
+        # Update in PostgreSQL
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import APICredentialModel
+            from sqlalchemy import select
+            async with async_session_factory() as session:
+                stmt = select(APICredentialModel).where(APICredentialModel.credential_id == credential_id)
+                res = await session.execute(stmt)
+                db_cred = res.scalar_one_or_none()
+                if db_cred:
+                    db_cred.revoked_at = cred.revoked_at
+                    await session.commit()
+        except Exception as exc:
+            logger.debug(f"PostgreSQL credential revoke skipped/failed ({exc})")
+
         return cred
 
-    def rotate_credential(self, credential_id: str, tenant_id: str) -> tuple[str, APICredentialRecord]:
-        old_cred = self.revoke_credential(credential_id, tenant_id)
-        return self.create_credential(
+    async def rotate_credential(self, credential_id: str, tenant_id: str) -> tuple[str, APICredentialRecord]:
+        old_cred = await self.revoke_credential(credential_id, tenant_id)
+        return await self.create_credential(
             tenant_id=tenant_id,
             user_id=old_cred.user_id,
             name=f"{old_cred.name} (Rotated)",
             role=old_cred.role,
         )
 
-    def list_tenant_credentials(self, tenant_id: str) -> List[APICredentialRecord]:
+    async def list_tenant_credentials(self, tenant_id: str) -> List[APICredentialRecord]:
+        # Query PostgreSQL to include any persisted credentials
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import APICredentialModel
+            from sqlalchemy import select
+            async with async_session_factory() as session:
+                stmt = select(APICredentialModel).where(APICredentialModel.tenant_id == tenant_id)
+                res = await session.execute(stmt)
+                db_creds = res.scalars().all()
+                for db_c in db_creds:
+                    if db_c.credential_id not in self.credentials:
+                        r_enum = RoleEnum(db_c.role) if db_c.role in [r.value for r in RoleEnum] else RoleEnum.OPERATOR
+                        rec = APICredentialRecord(
+                            credential_id=db_c.credential_id,
+                            tenant_id=db_c.tenant_id,
+                            user_id=db_c.user_id,
+                            name=db_c.name,
+                            key_hash=db_c.key_hash,
+                            role=r_enum,
+                            created_at=db_c.created_at or datetime.now(timezone.utc),
+                            expires_at=db_c.expires_at,
+                            revoked_at=db_c.revoked_at,
+                            last_used_at=db_c.last_used_at,
+                        )
+                        self.credentials[rec.credential_id] = rec
+                        self.hash_index[rec.key_hash] = rec.credential_id
+        except Exception as exc:
+            logger.debug(f"PostgreSQL credential list skipped/failed ({exc})")
+
         return [c for c in self.credentials.values() if c.tenant_id == tenant_id]
 
 

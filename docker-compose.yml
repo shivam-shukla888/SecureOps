@@ -9,8 +9,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - API_KEY=${API_KEY:-secureops-secret-api-key-change-in-production}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - API_KEY=${API_KEY:-}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
@@ -18,10 +18,10 @@ services:
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
       - RATE_LIMIT_BACKEND=${RATE_LIMIT_BACKEND:-redis}
-      - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/secureops
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/secureops}
       - N8N_APPROVAL_WEBHOOK_URL=${N8N_APPROVAL_WEBHOOK_URL:-}
-      - N8N_WEBHOOK_SECRET=${N8N_WEBHOOK_SECRET:-secureops-n8n-hmac-secret-key-change-me}
+      - N8N_WEBHOOK_SECRET=${N8N_WEBHOOK_SECRET:-}
       - APPROVAL_EXPIRY_MINUTES=${APPROVAL_EXPIRY_MINUTES:-60}
       - EXECUTION_TIMEOUT_SECONDS=${EXECUTION_TIMEOUT_SECONDS:-10.0}
     depends_on:

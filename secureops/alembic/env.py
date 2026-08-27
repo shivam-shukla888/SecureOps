@@ -13,7 +13,18 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+def get_async_db_url() -> str:
+    raw_url = (settings.DATABASE_URL or "").strip("\"' \t\r\n")
+    if raw_url.startswith("DATABASE_URL="):
+        raw_url = raw_url[len("DATABASE_URL="):].strip("\"' \t\r\n")
+    if raw_url.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + raw_url[len("postgresql://"):]
+    elif raw_url.startswith("postgres://"):
+        return "postgresql+asyncpg://" + raw_url[len("postgres://"):]
+    return raw_url
+
+db_url = get_async_db_url()
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 
@@ -38,8 +49,10 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
+    section = config.get_section(config.config_ini_section, {}).copy()
+    section["sqlalchemy.url"] = db_url
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

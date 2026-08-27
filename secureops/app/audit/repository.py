@@ -148,4 +148,123 @@ class InMemoryAuditRepository(BaseAuditRepository):
         return [redact_sensitive_data(l.to_dict()) for l in results[-limit:]]
 
 
-in_memory_audit_repo = InMemoryAuditRepository()
+class PostgresAuditRepository(BaseAuditRepository):
+    def __init__(self, fallback_repo: Optional[InMemoryAuditRepository] = None):
+        self.fallback_repo = fallback_repo or InMemoryAuditRepository()
+
+    async def save_audit_log(
+        self,
+        request_id: str,
+        user_id: str,
+        intent: str,
+        resource: str,
+        ai_risk: str,
+        policy_risk: str,
+        final_decision: str,
+        provider: str,
+        fallback_used: bool,
+        latency_ms: float,
+        tenant_id: str = "tenant_default",
+        error_status: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        # Always log to in-memory fallback for test runner inspection & fast retrieval
+        in_mem_res = await self.fallback_repo.save_audit_log(
+            request_id=request_id,
+            user_id=user_id,
+            intent=intent,
+            resource=resource,
+            ai_risk=ai_risk,
+            policy_risk=policy_risk,
+            final_decision=final_decision,
+            provider=provider,
+            fallback_used=fallback_used,
+            latency_ms=latency_ms,
+            tenant_id=tenant_id,
+            error_status=error_status,
+        )
+
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import AuditLogModel
+            async with async_session_factory() as session:
+                log_entry = AuditLogModel(
+                    request_id=request_id,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    intent=intent,
+                    resource=resource,
+                    ai_risk=ai_risk,
+                    policy_risk=policy_risk,
+                    final_decision=final_decision,
+                    provider=provider,
+                    fallback_used=fallback_used,
+                    latency_ms=latency_ms,
+                    error_status=error_status,
+                )
+                session.add(log_entry)
+                await session.commit()
+        except Exception as exc:
+            logger.debug(f"PostgreSQL audit save skipped/failed ({exc}); fallback record retained.")
+
+        return in_mem_res
+
+    async def list_audit_events(
+        self,
+        tenant_id: str,
+        user_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+        decision: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import AuditLogModel
+            from sqlalchemy import select
+            async with async_session_factory() as session:
+                stmt = select(AuditLogModel).where(AuditLogModel.tenant_id == tenant_id)
+                if user_id:
+                    stmt = stmt.where(AuditLogModel.user_id == user_id)
+                if request_id:
+                    stmt = stmt.where(AuditLogModel.request_id == request_id)
+                if decision:
+                    stmt = stmt.where(AuditLogModel.final_decision == decision.upper())
+                stmt = stmt.order_by(AuditLogModel.id.desc()).limit(limit)
+
+                res = await session.execute(stmt)
+                db_logs = res.scalars().all()
+                if db_logs:
+                    events = []
+                    for item in reversed(db_logs):
+                        dict_item = {
+                            "request_id": item.request_id,
+                            "tenant_id": item.tenant_id,
+                            "user_id": item.user_id,
+                            "intent": item.intent,
+                            "resource": item.resource,
+                            "ai_risk": item.ai_risk,
+                            "policy_risk": item.policy_risk,
+                            "final_decision": item.final_decision,
+                            "provider": item.provider,
+                            "fallback_used": item.fallback_used,
+                            "latency_ms": item.latency_ms,
+                            "error_status": item.error_status,
+                            "timestamp": item.timestamp.isoformat() if item.timestamp else datetime.now(timezone.utc).isoformat(),
+                        }
+                        events.append(redact_sensitive_data(dict_item))
+                    return events
+        except Exception as exc:
+            logger.debug(f"PostgreSQL audit list query skipped/failed ({exc}); using fallback repository.")
+
+        return await self.fallback_repo.list_audit_events(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            request_id=request_id,
+            decision=decision,
+            limit=limit,
+        )
+
+
+_raw_in_memory_audit_repo = InMemoryAuditRepository()
+postgres_audit_repo = PostgresAuditRepository(fallback_repo=_raw_in_memory_audit_repo)
+audit_repository = postgres_audit_repo
+in_memory_audit_repo = postgres_audit_repo  # Direct legacy references to PostgresAuditRepository

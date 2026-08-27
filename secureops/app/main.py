@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends, Request, HTTPException, Header, Query, sta
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.config import settings
+from app.config import settings, validate_production_config
 from app.schemas.request import SecureRequest
 from app.schemas.decision import (
     SecurityGatewayResponse,
@@ -42,22 +42,23 @@ from app.n8n.webhook import n8n_webhook_client
 from app.tools.integrations.document_service import document_service_adapter, DocumentSearchRequest
 
 from contextlib import asynccontextmanager
+from app.security.redis_service import redis_service
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """Validates configuration presence and logs sanitized startup status."""
+    validate_production_config()
     print("===============================================================================")
     print("                    SECUREOPS ENTERPRISE GATEWAY STARTUP                       ")
     print("===============================================================================")
     print(f"  ENVIRONMENT            : {settings.ENVIRONMENT}")
     print(f"  LOG_LEVEL              : {settings.LOG_LEVEL}")
     print(f"  API_KEY                : {'CONFIGURED' if settings.API_KEY else 'MISSING'}")
+    print(f"  DATABASE               : {'CONFIGURED' if settings.DATABASE_URL else 'MISSING'}")
+    print(f"  REDIS                  : {'CONFIGURED' if (settings.is_upstash_configured or settings.REDIS_URL) else 'MISSING'}")
+    print(f"  UPSTASH_REDIS          : {'CONFIGURED' if settings.is_upstash_configured else 'MISSING'}")
     print(f"  GEMINI_API_KEY         : {'CONFIGURED' if settings.GEMINI_API_KEY else 'MISSING'}")
-    print(f"  GEMINI_MODEL           : {'CONFIGURED' if settings.GEMINI_MODEL else 'MISSING'}")
     print(f"  GROQ_API_KEY           : {'CONFIGURED' if settings.GROQ_API_KEY else 'MISSING'}")
-    print(f"  GROQ_MODEL             : {'CONFIGURED' if settings.GROQ_MODEL else 'MISSING'}")
-    print(f"  RATE_LIMIT_BACKEND     : {settings.RATE_LIMIT_BACKEND}")
-    print(f"  DATABASE_URL           : {'CONFIGURED' if settings.DATABASE_URL else 'MISSING'}")
     print(f"  N8N_APPROVAL_WEBHOOK   : {'CONFIGURED' if settings.N8N_APPROVAL_WEBHOOK_URL else 'MISSING'}")
     print("===============================================================================\n")
     yield
@@ -74,10 +75,10 @@ app = FastAPI(
 # Enable CORS Middleware for Frontend Dashboard Integration & OPTIONS Preflight
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Accept", "Origin"],
 )
 
 # Add Security Headers Middleware
@@ -150,19 +151,27 @@ async def health_check():
 
 @app.get("/ready", tags=["Health & Status"])
 async def readiness_check():
-    """Readiness check testing rate limiter, audit storage, and metrics."""
+    """Readiness check testing rate limiter, PostgreSQL connectivity, Redis, and metrics."""
     limiter_ok = True
     try:
         await rate_limiter_instance.is_rate_limited("readiness_ping")
     except Exception:
         limiter_ok = False
 
+    from app.db.session import check_db_connectivity
+    db_ok = await check_db_connectivity()
+
+    redis_ok = await redis_service.ping() if redis_service.is_configured else True
+
     metrics_summary = metrics_tracker.get_summary()
 
+    overall_ready = limiter_ok and db_ok and redis_ok
+
     return {
-        "status": "ready" if limiter_ok else "degraded",
+        "status": "ready" if overall_ready else "degraded",
         "rate_limiter": "ready" if limiter_ok else "unhealthy",
-        "database": "ready",
+        "database": "ready" if db_ok else "unhealthy",
+        "redis": "ready" if redis_ok else ("unconfigured" if not redis_service.is_configured else "unhealthy"),
         "metrics_summary": metrics_summary,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -579,7 +588,7 @@ async def create_credential(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid role '{role_str}'. Valid roles: {[r.value for r in RoleEnum]}")
 
-    raw_key, record = credential_repo.create_credential(
+    raw_key, record = await credential_repo.create_credential(
         tenant_id=ctx.tenant_id,
         user_id=user_id,
         name=name,
@@ -618,7 +627,7 @@ async def revoke_credential(
     api_key: str = Depends(verify_api_key),
     ctx: TenantUserContext = Depends(require_role([RoleEnum.ADMIN, RoleEnum.OWNER])),
 ):
-    record = credential_repo.revoke_credential(credential_id, tenant_id=ctx.tenant_id)
+    record = await credential_repo.revoke_credential(credential_id, tenant_id=ctx.tenant_id)
     return {
         "status": "revoked",
         "credential_id": record.credential_id,
@@ -633,7 +642,7 @@ async def rotate_credential(
     api_key: str = Depends(verify_api_key),
     ctx: TenantUserContext = Depends(require_role([RoleEnum.ADMIN, RoleEnum.OWNER])),
 ):
-    raw_key, new_record = credential_repo.rotate_credential(credential_id, tenant_id=ctx.tenant_id)
+    raw_key, new_record = await credential_repo.rotate_credential(credential_id, tenant_id=ctx.tenant_id)
     return {
         "status": "rotated",
         "api_key": raw_key,

@@ -36,7 +36,7 @@ async def verify_api_key(
         )
 
     # Look up hashed credential record via token
-    cred_record = credential_repo.get_by_raw_key(token)
+    cred_record = await credential_repo.get_by_raw_key(token)
 
     if not cred_record:
         logger.warning(

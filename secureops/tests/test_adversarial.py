@@ -219,7 +219,29 @@ def test_adv_12_expired_approval(client, auth_headers):
         approval_id = resp.json()["approval_id"]
 
         ticket = asyncio.run(in_memory_approval_repo.get_ticket(approval_id))
-        ticket.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        past_time = datetime.now(timezone.utc) - timedelta(seconds=1)
+        ticket.expires_at = past_time
+
+        if hasattr(in_memory_approval_repo, "fallback_repo"):
+            fb_t = in_memory_approval_repo.fallback_repo.tickets.get(approval_id)
+            if fb_t:
+                fb_t.expires_at = past_time
+
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import ApprovalTicketModel
+            from sqlalchemy import select
+            async def _update_db():
+                async with async_session_factory() as session:
+                    stmt = select(ApprovalTicketModel).where(ApprovalTicketModel.approval_id == approval_id)
+                    res = await session.execute(stmt)
+                    db_t = res.scalar_one_or_none()
+                    if db_t:
+                        db_t.expires_at = past_time
+                        await session.commit()
+            asyncio.run(_update_db())
+        except Exception:
+            pass
 
         resp2 = client.post(f"/v1/approvals/{approval_id}/approve", json={"approver_id": "bob"}, headers=auth_headers)
         assert resp2.status_code == 400

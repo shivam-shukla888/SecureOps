@@ -147,7 +147,29 @@ def test_expired_approval_returns_400(client, auth_headers):
 
         # Manually expire ticket in repository
         ticket = asyncio.run(in_memory_approval_repo.get_ticket(approval_id))
-        ticket.expires_at = datetime.now(timezone.utc) - timedelta(minutes=10)
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+        ticket.expires_at = past_time
+
+        if hasattr(in_memory_approval_repo, "fallback_repo"):
+            fb_t = in_memory_approval_repo.fallback_repo.tickets.get(approval_id)
+            if fb_t:
+                fb_t.expires_at = past_time
+
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import ApprovalTicketModel
+            from sqlalchemy import select
+            async def _update_db():
+                async with async_session_factory() as session:
+                    stmt = select(ApprovalTicketModel).where(ApprovalTicketModel.approval_id == approval_id)
+                    res = await session.execute(stmt)
+                    db_t = res.scalar_one_or_none()
+                    if db_t:
+                        db_t.expires_at = past_time
+                        await session.commit()
+            asyncio.run(_update_db())
+        except Exception:
+            pass
 
         approve_resp = client.post(
             f"/v1/approvals/{approval_id}/approve",
@@ -156,6 +178,7 @@ def test_expired_approval_returns_400(client, auth_headers):
         )
         assert approve_resp.status_code == 400
         assert "expired" in approve_resp.json()["error"]["message"]
+
 
 
 def test_unauthorized_approval_returns_401(client):

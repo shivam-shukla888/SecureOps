@@ -7,12 +7,17 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 
+from app.security.redis_service import redis_service
+
 logger = logging.getLogger(__name__)
 
 
 class BaseRateLimiter(ABC):
     @abstractmethod
     async def is_rate_limited(self, identifier: str) -> bool:
+        pass
+
+    def reset(self):
         pass
 
 
@@ -43,55 +48,58 @@ class InMemoryRateLimiter(BaseRateLimiter):
 class RedisRateLimiter(BaseRateLimiter):
     def __init__(
         self,
-        redis_url: str = settings.REDIS_URL,
         requests_per_minute: int = settings.RATE_LIMIT_PER_MINUTE,
         window_seconds: int = 60,
     ):
-        self.redis_url = redis_url
         self.requests_per_minute = requests_per_minute
         self.window_seconds = window_seconds
         self.fallback_limiter = InMemoryRateLimiter(
             requests_per_minute=requests_per_minute,
             window_seconds=window_seconds,
         )
-        self._redis = None
 
-    async def _get_redis(self):
-        if self._redis is None:
-            try:
-                import redis.asyncio as redis
-                self._redis = redis.from_url(self.redis_url, socket_timeout=2.0)
-            except Exception as exc:
-                logger.warning(f"Failed to connect to Redis ({exc}); falling back to in-memory rate limiter.")
-                return None
-        return self._redis
+    def reset(self):
+        self.fallback_limiter.reset()
 
     async def is_rate_limited(self, identifier: str) -> bool:
         try:
-            r = await self._get_redis()
-            if r is None:
+            if not redis_service.is_configured:
+                if settings.ENVIRONMENT.lower() == "production":
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Production Error: Rate limiter storage unavailable."
+                    )
                 return await self.fallback_limiter.is_rate_limited(identifier)
 
             now = time.time()
+            cutoff = now - self.window_seconds
             key = f"ratelimit:{identifier}"
-            pipe = r.pipeline()
-            pipe.zremrangebyscore(key, 0, now - self.window_seconds)
-            pipe.zadd(key, {str(now): now})
-            pipe.zcard(key)
-            pipe.expire(key, self.window_seconds + 5)
-            results = await pipe.execute()
 
-            request_count = results[2]
+            commands = [
+                ["ZREMRANGEBYSCORE", key, "0", str(cutoff)],
+                ["ZADD", key, str(now), str(now)],
+                ["ZCARD", key],
+                ["EXPIRE", key, str(self.window_seconds + 5)],
+            ]
+            results = await redis_service.pipeline_execute(commands)
+            request_count = int(results[2]) if (isinstance(results, list) and len(results) >= 3) else 1
             return request_count > self.requests_per_minute
+        except HTTPException:
+            raise
         except Exception as exc:
-            logger.warning(f"Redis rate limiter error ({exc}); failing safe to in-memory rate limiter.")
+            if settings.ENVIRONMENT.lower() == "production":
+                logger.error(f"Production Redis rate limiter execution failure ({exc}); failing closed.")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Production Security Control Failure: Rate limiting backend unavailable."
+                )
+            logger.warning(f"Redis rate limiter error ({exc}); falling back to in-memory in dev.")
             return await self.fallback_limiter.is_rate_limited(identifier)
 
 
 def get_rate_limiter() -> BaseRateLimiter:
-    if settings.RATE_LIMIT_BACKEND.lower() == "redis":
+    if settings.RATE_LIMIT_BACKEND.lower() == "redis" or settings.is_upstash_configured:
         return RedisRateLimiter(
-            redis_url=settings.REDIS_URL,
             requests_per_minute=settings.RATE_LIMIT_PER_MINUTE,
         )
     return InMemoryRateLimiter(requests_per_minute=settings.RATE_LIMIT_PER_MINUTE)

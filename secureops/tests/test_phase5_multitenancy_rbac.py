@@ -16,29 +16,29 @@ from app.config import settings, validate_production_config
 
 def test_credential_creation_rotation_and_revocation():
     # 1. Create Credential for Tenant A
-    raw_key, record = credential_repo.create_credential(
+    raw_key, record = asyncio.run(credential_repo.create_credential(
         tenant_id="tenant_acme",
         user_id="user_acme_admin",
         name="Acme Admin Key",
         role=RoleEnum.ADMIN,
-    )
+    ))
     assert raw_key.startswith("secops_")
     assert record.tenant_id == "tenant_acme"
 
     # 2. Lookup Credential by Key
-    fetched = credential_repo.get_by_raw_key(raw_key)
+    fetched = asyncio.run(credential_repo.get_by_raw_key(raw_key))
     assert fetched is not None
     assert fetched.credential_id == record.credential_id
 
     # 3. Rotate Credential
-    new_raw_key, rotated_rec = credential_repo.rotate_credential(record.credential_id, tenant_id="tenant_acme")
+    new_raw_key, rotated_rec = asyncio.run(credential_repo.rotate_credential(record.credential_id, tenant_id="tenant_acme"))
     assert new_raw_key != raw_key
-    assert credential_repo.get_by_raw_key(raw_key) is None  # Old key revoked
-    assert credential_repo.get_by_raw_key(new_raw_key) is not None  # New key valid
+    assert asyncio.run(credential_repo.get_by_raw_key(raw_key)) is None  # Old key revoked
+    assert asyncio.run(credential_repo.get_by_raw_key(new_raw_key)) is not None  # New key valid
 
     # 4. Revoke Credential
-    credential_repo.revoke_credential(rotated_rec.credential_id, tenant_id="tenant_acme")
-    assert credential_repo.get_by_raw_key(new_raw_key) is None  # Revoked key returns None
+    asyncio.run(credential_repo.revoke_credential(rotated_rec.credential_id, tenant_id="tenant_acme"))
+    assert asyncio.run(credential_repo.get_by_raw_key(new_raw_key)) is None  # Revoked key returns None
 
 
 def test_cross_tenant_approval_access_blocked(client):
@@ -48,7 +48,7 @@ def test_cross_tenant_approval_access_blocked(client):
     )
 
     # Attempt to fetch/approve ticket using Tenant B credentials
-    raw_key_B, _ = credential_repo.create_credential("tenant_B", "userB_admin", "Tenant B Key", RoleEnum.ADMIN)
+    raw_key_B, _ = asyncio.run(credential_repo.create_credential("tenant_B", "userB_admin", "Tenant B Key", RoleEnum.ADMIN))
     headers_B = {"Authorization": f"Bearer {raw_key_B}"}
 
     # Cross-tenant GET /v1/approvals/appr_tenantA_1 -> 403 Forbidden
@@ -67,7 +67,7 @@ def test_cross_tenant_approval_access_blocked(client):
 
 def test_rbac_role_permissions_enforced(client):
     # Create Viewer credential for Tenant A
-    raw_key_viewer, _ = credential_repo.create_credential("tenant_A", "user_viewer", "Viewer Key", RoleEnum.VIEWER)
+    raw_key_viewer, _ = asyncio.run(credential_repo.create_credential("tenant_A", "user_viewer", "Viewer Key", RoleEnum.VIEWER))
     headers_viewer = {"Authorization": f"Bearer {raw_key_viewer}"}
 
     # Viewer attempts to create credential -> 403 Forbidden

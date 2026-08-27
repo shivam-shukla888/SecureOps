@@ -9,16 +9,19 @@ from app.tools.schemas import SearchDocumentInput
 
 
 def test_idempotency_caching_returns_duplicate_result():
-    mgr = IdempotencyManager()
-    user_id = "user_idempotent_1"
-    key = "idem_key_999"
-    payload = {"execution_id": "exec_1", "status": "executed", "data": "test"}
+    async def _run():
+        mgr = IdempotencyManager()
+        user_id = "user_idempotent_1"
+        key = "idem_key_999"
+        payload = {"execution_id": "exec_1", "status": "executed", "data": "test"}
 
-    mgr.save_record(user_id, key, payload)
+        await mgr.save_record(user_id, key, payload)
 
-    cached = mgr.get_record(user_id, key)
-    assert cached == payload
-    assert cached["execution_id"] == "exec_1"
+        cached = await mgr.get_record(user_id, key)
+        assert cached == payload
+        assert cached["execution_id"] == "exec_1"
+
+    asyncio.run(_run())
 
 
 def test_tool_execution_timeout_raises_504():

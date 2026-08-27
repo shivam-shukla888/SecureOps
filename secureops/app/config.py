@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # AI Provider API Keys & Models
-    PRIMARY_API_KEY: str = "sk-c0b078f9cca6d3da-3af242-0bb15fcc"
+    PRIMARY_API_KEY: str = ""
     PRIMARY_MODEL: str = "gpt-4o-mini"
     PRIMARY_BASE_URL: str = "https://api.openai.com/v1"
     GEMINI_API_KEY: str = ""
@@ -46,6 +46,23 @@ class Settings(BaseSettings):
     IDEMPOTENCY_TTL_SECONDS: int = 86400
     MAX_TOOL_INPUT_SIZE: int = 1000
 
+    # Upstash Redis REST Configuration
+    UPSTASH_REDIS_REST_URL: str = ""
+    UPSTASH_REDIS_REST_TOKEN: str = ""
+
+    # CORS Configuration
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        if not self.CORS_ALLOWED_ORIGINS:
+            return ["http://localhost:3000", "http://127.0.0.1:3000"]
+        return [origin.strip() for origin in self.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def is_upstash_configured(self) -> bool:
+        return bool(self.UPSTASH_REDIS_REST_URL.strip() and self.UPSTASH_REDIS_REST_TOKEN.strip())
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -56,10 +73,24 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
+DANGEROUS_DUMMY_KEYS = {
+    "test-secret-api-key-12345",
+    "your-secure-bearer-api-key-here",
+    "sk-c0b078f9cca6d3da-3af242-0bb15fcc",
+    "change-me",
+}
+
+DANGEROUS_HMAC_SECRETS = {
+    "test-hmac-secret-key-12345",
+    "your-hmac-sha256-secret-key-here",
+    "secureops-n8n-hmac-secret-key-change-me",
+}
+
+
 def validate_production_config():
     """
     Validates dangerous security settings on application startup.
-    Fails startup if critical settings are unsafe in production environment.
+    Fails startup if critical settings are unsafe or missing in production environment.
     """
     if settings.ENVIRONMENT.lower() == "production":
         if not settings.ALLOWED_OUTBOUND_HOSTS:
@@ -70,4 +101,30 @@ def validate_production_config():
             raise RuntimeError("Production Configuration Error: IDEMPOTENCY_TTL_SECONDS must be positive.")
         if settings.LOG_LEVEL.upper() == "DEBUG":
             raise RuntimeError("Production Configuration Error: Debug logging mode is forbidden in production environment.")
+
+        # Check API_KEY
+        if not settings.API_KEY or settings.API_KEY in DANGEROUS_DUMMY_KEYS:
+            raise RuntimeError("Production Configuration Error: API_KEY is missing or using unsafe default placeholder in production.")
+
+        # Check DATABASE_URL
+        if not settings.DATABASE_URL:
+            raise RuntimeError("Production Configuration Error: DATABASE_URL is missing in production.")
+
+        # Check REDIS_URL
+        if not settings.REDIS_URL:
+            raise RuntimeError("Production Configuration Error: REDIS_URL is missing in production.")
+
+        # Check AI Provider Keys (at least Gemini or Groq must be configured for AI provider operations)
+        has_gemini = bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY not in DANGEROUS_DUMMY_KEYS)
+        has_groq = bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY not in DANGEROUS_DUMMY_KEYS)
+        has_primary = bool(settings.PRIMARY_API_KEY and settings.PRIMARY_API_KEY not in DANGEROUS_DUMMY_KEYS)
+        if not (has_gemini or has_groq or has_primary):
+            raise RuntimeError("Production Configuration Error: Required AI provider credentials (GEMINI_API_KEY, GROQ_API_KEY, or PRIMARY_API_KEY) are missing in production.")
+
+        # Check N8N_WEBHOOK_SECRET if approval webhook is defined
+        if settings.N8N_APPROVAL_WEBHOOK_URL:
+            if not settings.N8N_WEBHOOK_SECRET or settings.N8N_WEBHOOK_SECRET in DANGEROUS_HMAC_SECRETS:
+                raise RuntimeError("Production Configuration Error: N8N_WEBHOOK_SECRET is missing or using unsafe placeholder in production.")
+
         logger.info("✅ Production security configuration validation passed successfully.")
+

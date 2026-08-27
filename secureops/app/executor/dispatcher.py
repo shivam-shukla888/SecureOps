@@ -10,9 +10,9 @@ from app.config import settings
 from app.schemas.decision import PolicyDecision, DecisionEnum
 from app.tools.registry import ToolRegistry
 from app.tools.permissions import ToolPermissionEngine
-from app.approval.repository import in_memory_approval_repo
+from app.approval.repository import approval_repository
 from app.security.idempotency import idempotency_manager
-from app.audit.repository import in_memory_audit_repo
+from app.audit.repository import postgres_audit_repo
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +32,13 @@ class ExecutionDispatcher:
         elif decision.decision == DecisionEnum.REQUIRE_APPROVAL:
             return {
                 "status": "pending_approval",
-                "message": f"Operation '{decision.intent.value}' on resource '{decision.resource}' requires approval. Ticket routed to approval workflow.",
-                "requires_approval": True,
+                "message": f"Operation '{decision.intent.value}' requires HITL approval due to risk policy.",
                 "simulated": True,
             }
-        else:  # BLOCK
+        else:
             return {
                 "status": "blocked",
-                "message": f"Operation '{decision.intent.value}' rejected by security policy.",
-                "reason": decision.reason,
+                "message": f"Operation '{decision.intent.value}' blocked by policy engine.",
                 "simulated": True,
             }
 
@@ -57,9 +55,9 @@ class ExecutionDispatcher:
         start_time = time.time()
         execution_id = f"exec_{uuid.uuid4().hex[:12]}"
 
-        # 1. Idempotency check
+        # 1. Idempotency check with tenant_id
         if idempotency_key:
-            cached = idempotency_manager.get_record(user_id, idempotency_key)
+            cached = await idempotency_manager.get_record(user_id, idempotency_key, tenant_id=tenant_id)
             if cached:
                 return cached
 
@@ -69,7 +67,7 @@ class ExecutionDispatcher:
         # 3. Retrieve Approval Ticket if approval_id provided
         approval_ticket = None
         if approval_id:
-            approval_ticket = await in_memory_approval_repo.get_ticket(approval_id)
+            approval_ticket = await approval_repository.get_ticket(approval_id, tenant_id=tenant_id)
 
         # 4. Extract target resource for binding validation
         target_resource = tool_input.get("target_resource") or tool_input.get("query") or tool_input.get("document_id") or policy_decision.resource
@@ -135,12 +133,12 @@ class ExecutionDispatcher:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-        # 8. Save Idempotency Cache Record
+        # 8. Save Idempotency Cache Record with tenant_id
         if idempotency_key:
-            idempotency_manager.save_record(user_id, idempotency_key, response_payload)
+            await idempotency_manager.save_record(user_id, idempotency_key, response_payload, tenant_id=tenant_id)
 
-        # 9. Audit Event Logging
-        await in_memory_audit_repo.save_audit_log(
+        # 9. Audit Event Logging with tenant_id
+        await postgres_audit_repo.save_audit_log(
             request_id=request_id,
             user_id=user_id,
             intent=policy_decision.intent.value,
@@ -151,6 +149,7 @@ class ExecutionDispatcher:
             provider=f"tool:{tool_def.name}",
             fallback_used=False,
             latency_ms=latency_ms,
+            tenant_id=tenant_id,
         )
 
         return response_payload

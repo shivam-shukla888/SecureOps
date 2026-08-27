@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from fastapi import HTTPException, status
-from app.approval.repository import ApprovalTicket, in_memory_approval_repo
+from app.approval.repository import ApprovalTicket, approval_repository
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class HITLApprovalManager:
         policy_risk: str,
         tenant_id: str = "tenant_default",
     ) -> ApprovalTicket:
-        return await in_memory_approval_repo.create_ticket(
+        return await approval_repository.create_ticket(
             approval_id=approval_id,
             request_id=request_id,
             requester_id=requester_id,
@@ -29,7 +29,7 @@ class HITLApprovalManager:
 
     @staticmethod
     async def approve(approval_id: str, approver_id: str, tenant_id: Optional[str] = None) -> ApprovalTicket:
-        ticket = await in_memory_approval_repo.get_ticket(approval_id, tenant_id=tenant_id)
+        ticket = await approval_repository.get_ticket(approval_id, tenant_id=tenant_id)
         if not ticket:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -47,7 +47,7 @@ class HITLApprovalManager:
             )
 
         if ticket.is_expired():
-            await in_memory_approval_repo.update_ticket_status(approval_id, "EXPIRED", approver_id, tenant_id=tenant_id)
+            await approval_repository.update_ticket_status(approval_id, "EXPIRED", approver_id, tenant_id=tenant_id)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Approval ticket '{approval_id}' has expired."
@@ -59,11 +59,11 @@ class HITLApprovalManager:
                 detail=f"Approval ticket '{approval_id}' was {ticket.status.lower()} and cannot be reused. It has already been {ticket.status.lower()}."
             )
 
-        return await in_memory_approval_repo.update_ticket_status(approval_id, "APPROVED", approver_id, tenant_id=tenant_id)
+        return await approval_repository.update_ticket_status(approval_id, "APPROVED", approver_id, tenant_id=tenant_id)
 
     @staticmethod
     async def reject(approval_id: str, approver_id: str, tenant_id: Optional[str] = None) -> ApprovalTicket:
-        ticket = await in_memory_approval_repo.get_ticket(approval_id, tenant_id=tenant_id)
+        ticket = await approval_repository.get_ticket(approval_id, tenant_id=tenant_id)
         if not ticket:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -71,7 +71,7 @@ class HITLApprovalManager:
             )
 
         if ticket.is_expired():
-            await in_memory_approval_repo.update_ticket_status(approval_id, "EXPIRED", approver_id, tenant_id=tenant_id)
+            await approval_repository.update_ticket_status(approval_id, "EXPIRED", approver_id, tenant_id=tenant_id)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Approval ticket '{approval_id}' has expired."
@@ -83,7 +83,7 @@ class HITLApprovalManager:
                 detail=f"Approval ticket '{approval_id}' was {ticket.status.lower()} and cannot be reused. It has already been {ticket.status.lower()}."
             )
 
-        return await in_memory_approval_repo.update_ticket_status(approval_id, "REJECTED", approver_id, tenant_id=tenant_id)
+        return await approval_repository.update_ticket_status(approval_id, "REJECTED", approver_id, tenant_id=tenant_id)
 
 
 approval_manager = HITLApprovalManager()
