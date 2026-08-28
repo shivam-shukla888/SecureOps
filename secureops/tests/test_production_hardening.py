@@ -33,13 +33,15 @@ def test_prod_2_missing_database_url_fails_startup():
 
 
 def test_prod_3_missing_redis_url_fails_startup():
-    with patch("app.config.settings.ENVIRONMENT", "production"):
-        with patch("app.config.settings.API_KEY", "secops_prod_secret_key_valid_123456"):
-            with patch("app.config.settings.DATABASE_URL", "postgresql+asyncpg://user:pass@localhost:5432/db"):
-                with patch("app.config.settings.REDIS_URL", ""):
-                    with pytest.raises(RuntimeError) as exc_info:
-                        validate_production_config()
-                    assert "REDIS_URL is missing" in str(exc_info.value)
+    with patch("app.config.settings.ENVIRONMENT", "production"), \
+         patch("app.config.settings.API_KEY", "secops_prod_secret_key_valid_123456"), \
+         patch("app.config.settings.DATABASE_URL", "postgresql+asyncpg://user:pass@localhost:5432/db"), \
+         patch("app.config.settings.REDIS_URL", ""), \
+         patch("app.config.settings.UPSTASH_REDIS_REST_URL", ""), \
+         patch("app.config.settings.UPSTASH_REDIS_REST_TOKEN", ""):
+        with pytest.raises(RuntimeError) as exc_info:
+            validate_production_config()
+        assert "Production Redis configuration is missing" in str(exc_info.value) or "REDIS_URL is missing" in str(exc_info.value)
 
 
 def test_prod_4_missing_provider_credentials_fails_startup():

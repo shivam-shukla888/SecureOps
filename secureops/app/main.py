@@ -55,8 +55,9 @@ async def lifespan(app_instance: FastAPI):
     print(f"  LOG_LEVEL              : {settings.LOG_LEVEL}")
     print(f"  API_KEY                : {'CONFIGURED' if settings.API_KEY else 'MISSING'}")
     print(f"  DATABASE               : {'CONFIGURED' if settings.DATABASE_URL else 'MISSING'}")
-    print(f"  REDIS                  : {'CONFIGURED' if (settings.is_upstash_configured or settings.REDIS_URL) else 'MISSING'}")
+    print(f"  REDIS                  : {'CONFIGURED' if (settings.is_upstash_configured or settings.has_remote_redis or settings.REDIS_URL) else 'MISSING'}")
     print(f"  UPSTASH_REDIS          : {'CONFIGURED' if settings.is_upstash_configured else 'MISSING'}")
+    print(f"  RATE_LIMIT_BACKEND     : {settings.RATE_LIMIT_BACKEND}")
     print(f"  GEMINI_API_KEY         : {'CONFIGURED' if settings.GEMINI_API_KEY else 'MISSING'}")
     print(f"  GROQ_API_KEY           : {'CONFIGURED' if settings.GROQ_API_KEY else 'MISSING'}")
     print(f"  N8N_APPROVAL_WEBHOOK   : {'CONFIGURED' if settings.N8N_APPROVAL_WEBHOOK_URL else 'MISSING'}")
@@ -84,25 +85,26 @@ app = FastAPI(
     description="Enterprise Multi-Tenant AI Gateway, Deterministic Policy Engine, Hashed Credential Manager & Secure Executor",
     version="5.0.0",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 app.include_router(agents_router)
 app.include_router(evaluations_router)
 app.include_router(benchmarks_router)
 
-
-# Enable CORS Middleware for Frontend Dashboard Integration & OPTIONS Preflight
+# Global exception handlers & middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Accept", "Origin"],
+    expose_headers=["X-Request-ID", "Strict-Transport-Security", "X-Content-Type-Options", "X-Frame-Options"],
+    max_age=600,
 )
-
-# Add Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
-
 
 
 # Exception Handlers for Unified JSON Error Output
@@ -170,27 +172,44 @@ async def health_check():
 
 @app.get("/ready", tags=["Health & Status"])
 async def readiness_check():
-    """Readiness check testing rate limiter, PostgreSQL connectivity, Redis, and metrics."""
-    limiter_ok = True
-    try:
-        await rate_limiter_instance.is_rate_limited("readiness_ping")
-    except Exception:
-        limiter_ok = False
-
+    """Readiness check testing rate limiter, PostgreSQL connectivity, Redis, and metrics based on REAL connectivity."""
     from app.db.session import check_db_connectivity
     db_ok = await check_db_connectivity()
 
-    redis_ok = await redis_service.ping() if redis_service.is_configured else True
+    is_prod = str(getattr(settings, "ENVIRONMENT", "development")).lower() == "production"
+
+    redis_ok = False
+    if redis_service.is_configured:
+        redis_ok = await redis_service.ping()
+    elif not is_prod:
+        redis_ok = True
+
+    limiter_ok = False
+    try:
+        is_limited = await rate_limiter_instance.is_rate_limited("readiness_check")
+        if is_prod:
+            limiter_ok = redis_ok and not is_limited
+        else:
+            limiter_ok = not is_limited
+    except Exception as exc:
+        logger.warning(f"Rate limiter readiness check failed: {exc}")
+        limiter_ok = False
 
     metrics_summary = metrics_tracker.get_summary()
+    overall_ready = db_ok and redis_ok and limiter_ok
 
-    overall_ready = limiter_ok and db_ok and redis_ok
+    if redis_ok:
+        redis_status = "ready"
+    elif redis_service.is_configured or is_prod:
+        redis_status = "unhealthy"
+    else:
+        redis_status = "unconfigured"
 
     return {
         "status": "ready" if overall_ready else "degraded",
         "rate_limiter": "ready" if limiter_ok else "unhealthy",
         "database": "ready" if db_ok else "unhealthy",
-        "redis": "ready" if redis_ok else ("unconfigured" if not redis_service.is_configured else "unhealthy"),
+        "redis": redis_status,
         "metrics_summary": metrics_summary,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

@@ -6,8 +6,7 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException, status
 
 from app.config import settings
-
-from app.security.redis_service import redis_service
+from app.security.redis_service import redis_service, RedisService
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +29,14 @@ class InMemoryRateLimiter(BaseRateLimiter):
     async def is_rate_limited(self, identifier: str) -> bool:
         now = time.time()
         cutoff = now - self.window_seconds
-        
+
         self.requests[identifier] = [
             ts for ts in self.requests[identifier] if ts > cutoff
         ]
-        
+
         if len(self.requests[identifier]) >= self.requests_per_minute:
             return True
-        
+
         self.requests[identifier].append(now)
         return False
 
@@ -54,8 +53,7 @@ class RedisRateLimiter(BaseRateLimiter):
     ):
         self.requests_per_minute = requests_per_minute
         self.window_seconds = window_seconds
-        from app.security.redis_service import RedisService, redis_service as default_redis_service
-        self.redis_service = RedisService(redis_url=redis_url) if redis_url else default_redis_service
+        self.redis_service = RedisService(redis_url=redis_url) if redis_url else redis_service
         self.fallback_limiter = InMemoryRateLimiter(
             requests_per_minute=requests_per_minute,
             window_seconds=window_seconds,
@@ -65,15 +63,18 @@ class RedisRateLimiter(BaseRateLimiter):
         self.fallback_limiter.reset()
 
     async def is_rate_limited(self, identifier: str) -> bool:
-        try:
-            if not self.redis_service.is_configured:
-                if str(getattr(settings, "ENVIRONMENT", "development")).lower() == "production":
-                    raise HTTPException(
-                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail="Production Error: Rate limiter storage unavailable."
-                    )
-                return await self.fallback_limiter.is_rate_limited(identifier)
+        is_prod = str(getattr(settings, "ENVIRONMENT", "development")).lower() == "production"
 
+        if not self.redis_service.is_configured:
+            if is_prod:
+                logger.error("Production Error: Rate limiter Redis backend is not configured; failing closed.")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Production Security Control Failure: Rate limiting backend unavailable."
+                )
+            return await self.fallback_limiter.is_rate_limited(identifier)
+
+        try:
             now = time.time()
             cutoff = now - self.window_seconds
             key = f"ratelimit:{identifier}"
@@ -90,8 +91,8 @@ class RedisRateLimiter(BaseRateLimiter):
         except HTTPException:
             raise
         except Exception as exc:
-            if str(getattr(settings, "ENVIRONMENT", "development")).lower() == "production":
-                logger.error(f"Production Redis rate limiter execution failure ({exc}); failing closed.")
+            if is_prod:
+                logger.error(f"Production Redis rate limiter execution failure ({type(exc).__name__}); failing closed.")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="Production Security Control Failure: Rate limiting backend unavailable."
@@ -101,8 +102,8 @@ class RedisRateLimiter(BaseRateLimiter):
 
 
 def get_rate_limiter() -> BaseRateLimiter:
-
-    if settings.RATE_LIMIT_BACKEND.lower() == "redis" or settings.is_upstash_configured:
+    is_prod = str(getattr(settings, "ENVIRONMENT", "development")).lower() == "production"
+    if settings.RATE_LIMIT_BACKEND.lower() == "redis" or settings.is_upstash_configured or is_prod:
         return RedisRateLimiter(
             requests_per_minute=settings.RATE_LIMIT_PER_MINUTE,
         )

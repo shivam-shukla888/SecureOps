@@ -61,7 +61,14 @@ class Settings(BaseSettings):
 
     @property
     def is_upstash_configured(self) -> bool:
-        return bool(self.UPSTASH_REDIS_REST_URL.strip() and self.UPSTASH_REDIS_REST_TOKEN.strip())
+        url = self.UPSTASH_REDIS_REST_URL.strip("\"' \t\r\n")
+        token = self.UPSTASH_REDIS_REST_TOKEN.strip("\"' \t\r\n")
+        return bool(url and token)
+
+    @property
+    def has_remote_redis(self) -> bool:
+        url = self.REDIS_URL.strip("\"' \t\r\n")
+        return bool(url and url != "redis://localhost:6379/0")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -107,12 +114,12 @@ def validate_production_config():
             raise RuntimeError("Production Configuration Error: API_KEY is missing or using unsafe default placeholder in production.")
 
         # Check DATABASE_URL
-        if not settings.DATABASE_URL:
-            raise RuntimeError("Production Configuration Error: DATABASE_URL is missing in production.")
+        if not settings.DATABASE_URL or settings.DATABASE_URL == "postgresql+asyncpg://postgres:postgres@localhost:5432/secureops":
+            raise RuntimeError("Production Configuration Error: Remote DATABASE_URL is missing or using localhost placeholder in production.")
 
-        # Check REDIS_URL
-        if not settings.REDIS_URL:
-            raise RuntimeError("Production Configuration Error: REDIS_URL is missing in production.")
+        # Check Redis (Upstash REST or remote REDIS_URL required in production)
+        if not (settings.is_upstash_configured or settings.has_remote_redis):
+            raise RuntimeError("Production Configuration Error: Production Redis configuration is missing. Configure UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN or a remote REDIS_URL in production.")
 
         # Check AI Provider Keys (at least Gemini or Groq must be configured for AI provider operations)
         has_gemini = bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY not in DANGEROUS_DUMMY_KEYS)
@@ -126,5 +133,4 @@ def validate_production_config():
             if not settings.N8N_WEBHOOK_SECRET or settings.N8N_WEBHOOK_SECRET in DANGEROUS_HMAC_SECRETS:
                 raise RuntimeError("Production Configuration Error: N8N_WEBHOOK_SECRET is missing or using unsafe placeholder in production.")
 
-        logger.info("✅ Production security configuration validation passed successfully.")
-
+        logger.info("Production security configuration validation passed successfully.")

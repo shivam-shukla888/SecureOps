@@ -2,28 +2,18 @@ import asyncio
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 
-from app.config import settings
+from app.db.session import get_db_connection_params
 from app.db.models import Base
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-def get_async_db_url() -> str:
-    raw_url = (settings.DATABASE_URL or "").strip("\"' \t\r\n")
-    if raw_url.startswith("DATABASE_URL="):
-        raw_url = raw_url[len("DATABASE_URL="):].strip("\"' \t\r\n")
-    if raw_url.startswith("postgresql://"):
-        return "postgresql+asyncpg://" + raw_url[len("postgresql://"):]
-    elif raw_url.startswith("postgres://"):
-        return "postgresql+asyncpg://" + raw_url[len("postgres://"):]
-    return raw_url
-
-db_url = get_async_db_url()
+db_url, connect_args = get_db_connection_params()
 config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
@@ -49,12 +39,10 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    section = config.get_section(config.config_ini_section, {}).copy()
-    section["sqlalchemy.url"] = db_url
-    connectable = async_engine_from_config(
-        section,
-        prefix="sqlalchemy.",
+    connectable = create_async_engine(
+        db_url,
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
 
     async with connectable.connect() as connection:
