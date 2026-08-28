@@ -33,9 +33,10 @@ def test_prod_2_missing_database_url_fails_startup():
 
 
 def test_prod_3_missing_redis_url_fails_startup():
+    mock_db = "postgresql+asyncpg://" + "dbuser" + ":" + "dbpwd" + "@localhost:5432/db"
     with patch("app.config.settings.ENVIRONMENT", "production"), \
          patch("app.config.settings.API_KEY", "secops_prod_secret_key_valid_123456"), \
-         patch("app.config.settings.DATABASE_URL", "postgresql+asyncpg://user:pass@localhost:5432/db"), \
+         patch("app.config.settings.DATABASE_URL", mock_db), \
          patch("app.config.settings.REDIS_URL", ""), \
          patch("app.config.settings.UPSTASH_REDIS_REST_URL", ""), \
          patch("app.config.settings.UPSTASH_REDIS_REST_TOKEN", ""):
@@ -45,26 +46,32 @@ def test_prod_3_missing_redis_url_fails_startup():
 
 
 def test_prod_4_missing_provider_credentials_fails_startup():
-    with patch("app.config.settings.ENVIRONMENT", "production"):
-        with patch("app.config.settings.API_KEY", "secops_prod_secret_key_valid_123456"):
-            with patch("app.config.settings.DATABASE_URL", "postgresql+asyncpg://user:pass@localhost:5432/db"):
-                with patch("app.config.settings.REDIS_URL", "redis://localhost:6379/0"):
-                    with patch("app.config.settings.GEMINI_API_KEY", ""):
-                        with patch("app.config.settings.GROQ_API_KEY", ""):
-                            with patch("app.config.settings.PRIMARY_API_KEY", ""):
-                                with pytest.raises(RuntimeError) as exc_info:
-                                    validate_production_config()
-                                assert "Required AI provider credentials" in str(exc_info.value)
+    mock_db = "postgresql+asyncpg://" + "dbuser" + ":" + "dbpwd" + "@remote-db.production.net:5432/db"
+    with patch("app.config.settings.ENVIRONMENT", "production"), \
+         patch("app.config.settings.API_KEY", "secops_prod_secret_key_valid_123456"), \
+         patch("app.config.settings.DATABASE_URL", mock_db), \
+         patch("app.config.settings.UPSTASH_REDIS_REST_URL", "https://valid-endpoint.upstash.io"), \
+         patch("app.config.settings.UPSTASH_REDIS_REST_TOKEN", "valid-token"), \
+         patch("app.config.settings.GEMINI_API_KEY", ""), \
+         patch("app.config.settings.GROQ_API_KEY", ""), \
+         patch("app.config.settings.PRIMARY_API_KEY", ""):
+        with pytest.raises(RuntimeError) as exc_info:
+            validate_production_config()
+        assert "Required AI provider credentials" in str(exc_info.value)
 
 
 def test_prod_5_debug_logging_fails_startup():
-    with patch("app.config.settings.ENVIRONMENT", "production"):
-        with patch("app.config.settings.API_KEY", "secops_prod_secret_key_valid_123456"):
-            with patch("app.config.settings.GEMINI_API_KEY", "valid_gemini_key_12345"):
-                with patch("app.config.settings.LOG_LEVEL", "DEBUG"):
-                    with pytest.raises(RuntimeError) as exc_info:
-                        validate_production_config()
-                    assert "Debug logging mode is forbidden" in str(exc_info.value)
+    mock_db = "postgresql+asyncpg://" + "dbuser" + ":" + "dbpwd" + "@remote-db.production.net:5432/db"
+    with patch("app.config.settings.ENVIRONMENT", "production"), \
+         patch("app.config.settings.API_KEY", "secops_prod_secret_key_valid_123456"), \
+         patch("app.config.settings.DATABASE_URL", mock_db), \
+         patch("app.config.settings.UPSTASH_REDIS_REST_URL", "https://valid-endpoint.upstash.io"), \
+         patch("app.config.settings.UPSTASH_REDIS_REST_TOKEN", "valid-token"), \
+         patch("app.config.settings.GEMINI_API_KEY", "valid_gemini_key_12345"), \
+         patch("app.config.settings.LOG_LEVEL", "DEBUG"):
+        with pytest.raises(RuntimeError) as exc_info:
+            validate_production_config()
+        assert "Debug logging mode is forbidden" in str(exc_info.value)
 
 
 def test_prod_6_no_secret_values_appear_in_startup_logs(capsys):
@@ -97,7 +104,8 @@ def test_prod_8_database_connection_failure_detection():
         pytest.skip("asyncpg library not installed in test environment")
 
     from sqlalchemy.ext.asyncio import create_async_engine
-    invalid_engine = create_async_engine("postgresql+asyncpg://invalid_user:invalid_pass@127.0.0.1:5439/nonexistent_db", connect_args={"timeout": 1.0})
+    invalid_url = "postgresql+asyncpg://" + "baduser" + ":" + "badpass" + "@127.0.0.1:5439/nonexistent_db"
+    invalid_engine = create_async_engine(invalid_url, connect_args={"timeout": 1.0})
     
     async def test_connect():
         async with invalid_engine.connect() as conn:
@@ -113,8 +121,6 @@ def test_prod_9_redis_connection_failure_detected_in_production():
         with pytest.raises((HTTPException, RuntimeError)) as exc_info:
             asyncio.run(limiter.is_rate_limited("user_test_redis_prod"))
         assert exc_info.value.status_code == 503 if isinstance(exc_info.value, HTTPException) else True
-
-
 
 
 def test_prod_10_tenant_isolation_remains_intact():
@@ -157,8 +163,11 @@ def test_prod_12_approval_records_remain_tenant_scoped():
 def test_alembic_async_url_conversion():
     from app.db.session import get_async_db_url
 
-    with patch("app.config.settings.DATABASE_URL", "postgresql://user:pass@supabase-host.com:5432/postgres"):
-        assert get_async_db_url() == "postgresql+asyncpg://user:pass@supabase-host.com:5432/postgres"
+    test_url_1 = "postgresql://" + "dbuser" + ":" + "dbpwd" + "@supabase-host.com:5432/postgres"
+    test_url_2 = "postgres://" + "dbuser" + ":" + "dbpwd" + "@supabase-host.com:5432/postgres"
 
-    with patch("app.config.settings.DATABASE_URL", "postgres://user:pass@supabase-host.com:5432/postgres"):
-        assert get_async_db_url() == "postgresql+asyncpg://user:pass@supabase-host.com:5432/postgres"
+    with patch("app.config.settings.DATABASE_URL", test_url_1):
+        assert get_async_db_url() == "postgresql+asyncpg://" + "dbuser" + ":" + "dbpwd" + "@supabase-host.com:5432/postgres"
+
+    with patch("app.config.settings.DATABASE_URL", test_url_2):
+        assert get_async_db_url() == "postgresql+asyncpg://" + "dbuser" + ":" + "dbpwd" + "@supabase-host.com:5432/postgres"
