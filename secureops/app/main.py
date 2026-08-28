@@ -60,7 +60,17 @@ async def lifespan(app_instance: FastAPI):
     print(f"  GEMINI_API_KEY         : {'CONFIGURED' if settings.GEMINI_API_KEY else 'MISSING'}")
     print(f"  GROQ_API_KEY           : {'CONFIGURED' if settings.GROQ_API_KEY else 'MISSING'}")
     print(f"  N8N_APPROVAL_WEBHOOK   : {'CONFIGURED' if settings.N8N_APPROVAL_WEBHOOK_URL else 'MISSING'}")
-    print("===============================================================================\n")
+    print(f"  CORS CONFIGURED        : True")
+    print(f"  CORS ORIGINS COUNT     : {len(settings.cors_origins_list)}")
+    print("===============================================================================")
+    if settings.ENVIRONMENT.lower() != "production":
+        print("  REGISTERED API ROUTES:")
+        for route in app_instance.routes:
+            if hasattr(route, "methods") and hasattr(route, "path"):
+                methods = ", ".join(sorted(route.methods - {"HEAD"}))
+                if methods:
+                    print(f"    {methods:<16} {route.path}")
+        print("===============================================================================\n")
     yield
 
 from fastapi.middleware.cors import CORSMiddleware
