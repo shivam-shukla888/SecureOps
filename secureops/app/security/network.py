@@ -75,3 +75,14 @@ class SSRFProtector:
 
 
 ssrf_protector = SSRFProtector()
+
+
+def validate_destination_url(url: str):
+    try:
+        ssrf_protector.validate_outbound_destination(url)
+        return True, ""
+    except HTTPException as e:
+        return False, e.detail
+    except Exception as exc:
+        return False, str(exc)
+

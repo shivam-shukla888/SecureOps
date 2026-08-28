@@ -40,6 +40,10 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+get_db = get_db_session
+
+
+
 async def check_db_connectivity() -> bool:
     """Executes a lightweight ping query (SELECT 1) against PostgreSQL."""
     try:

@@ -29,6 +29,12 @@ class ClassifierResult(BaseModel):
     resource: str = "unknown"
     risk: RiskEnum = RiskEnum.HIGH
     requires_approval: bool = True
+    confidence: float = 0.9
+
+    @property
+    def is_prompt_injection(self) -> bool:
+        return self.intent == IntentEnum.UNKNOWN or self.risk == RiskEnum.HIGH
+
 
 
 class PolicyDecision(BaseModel):

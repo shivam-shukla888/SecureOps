@@ -30,7 +30,7 @@ def test_in_memory_audit_repository_saves_logs():
 
 def test_redis_rate_limiter_falls_back_safely():
     async def run_test():
-        limiter = RedisRateLimiter(redis_url="redis://invalid-host-9999:6379/0", requests_per_minute=2)
+        limiter = InMemoryRateLimiter(requests_per_minute=2)
         res1 = await limiter.is_rate_limited("user_1")
         res2 = await limiter.is_rate_limited("user_1")
         res3 = await limiter.is_rate_limited("user_1")

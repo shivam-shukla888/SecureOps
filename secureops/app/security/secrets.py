@@ -75,3 +75,27 @@ class CloudSecretManagerProvider(SecretProvider):
 
 
 secret_provider = EnvironmentSecretProvider()
+
+import re
+
+SECRET_PATTERNS = [
+    re.compile(r"sk-[a-zA-Z0-9]{20,}", re.IGNORECASE),
+    re.compile(r"secops_[a-zA-Z0-9_]{16,}", re.IGNORECASE),
+    re.compile(r"ghp_[a-zA-Z0-9]{36}", re.IGNORECASE),
+    re.compile(r"AKIA[0-9A-Z]{16}", re.IGNORECASE),
+]
+
+
+def redact_secrets(text: str) -> str:
+    if not isinstance(text, str):
+        return str(text)
+    redacted = text
+    for pattern in SECRET_PATTERNS:
+        redacted = pattern.sub("[REDACTED_SECRET]", redacted)
+    return redacted
+
+
+def redact_dict(data: dict) -> dict:
+    from app.audit.logger import sanitize_dict
+    return sanitize_dict(data)
+

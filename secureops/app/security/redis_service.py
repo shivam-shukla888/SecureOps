@@ -18,11 +18,17 @@ class RedisService:
         rest_token: Optional[str] = None,
         redis_url: Optional[str] = None,
     ):
-        self._rest_url = (rest_url if rest_url is not None else settings.UPSTASH_REDIS_REST_URL).strip()
-        self._rest_token = (rest_token if rest_token is not None else settings.UPSTASH_REDIS_REST_TOKEN).strip()
-        self._redis_url = (redis_url if redis_url is not None else settings.REDIS_URL).strip()
+        if redis_url is not None:
+            self._rest_url = (rest_url or "").strip()
+            self._rest_token = (rest_token or "").strip()
+            self._redis_url = redis_url.strip()
+        else:
+            self._rest_url = (rest_url if rest_url is not None else settings.UPSTASH_REDIS_REST_URL).strip()
+            self._rest_token = (rest_token if rest_token is not None else settings.UPSTASH_REDIS_REST_TOKEN).strip()
+            self._redis_url = (redis_url if redis_url is not None else settings.REDIS_URL).strip()
         self._http_client: Optional[httpx.AsyncClient] = None
         self._redis_py_client = None
+
 
     def _get_http_client(self) -> httpx.AsyncClient:
         if self._http_client is None or self._http_client.is_closed:

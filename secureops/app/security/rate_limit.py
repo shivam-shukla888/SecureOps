@@ -50,9 +50,12 @@ class RedisRateLimiter(BaseRateLimiter):
         self,
         requests_per_minute: int = settings.RATE_LIMIT_PER_MINUTE,
         window_seconds: int = 60,
+        redis_url: Optional[str] = None,
     ):
         self.requests_per_minute = requests_per_minute
         self.window_seconds = window_seconds
+        from app.security.redis_service import RedisService, redis_service as default_redis_service
+        self.redis_service = RedisService(redis_url=redis_url) if redis_url else default_redis_service
         self.fallback_limiter = InMemoryRateLimiter(
             requests_per_minute=requests_per_minute,
             window_seconds=window_seconds,
@@ -63,8 +66,8 @@ class RedisRateLimiter(BaseRateLimiter):
 
     async def is_rate_limited(self, identifier: str) -> bool:
         try:
-            if not redis_service.is_configured:
-                if settings.ENVIRONMENT.lower() == "production":
+            if not self.redis_service.is_configured:
+                if str(getattr(settings, "ENVIRONMENT", "development")).lower() == "production":
                     raise HTTPException(
                         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                         detail="Production Error: Rate limiter storage unavailable."
@@ -81,13 +84,13 @@ class RedisRateLimiter(BaseRateLimiter):
                 ["ZCARD", key],
                 ["EXPIRE", key, str(self.window_seconds + 5)],
             ]
-            results = await redis_service.pipeline_execute(commands)
+            results = await self.redis_service.pipeline_execute(commands)
             request_count = int(results[2]) if (isinstance(results, list) and len(results) >= 3) else 1
             return request_count > self.requests_per_minute
         except HTTPException:
             raise
         except Exception as exc:
-            if settings.ENVIRONMENT.lower() == "production":
+            if str(getattr(settings, "ENVIRONMENT", "development")).lower() == "production":
                 logger.error(f"Production Redis rate limiter execution failure ({exc}); failing closed.")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -98,6 +101,7 @@ class RedisRateLimiter(BaseRateLimiter):
 
 
 def get_rate_limiter() -> BaseRateLimiter:
+
     if settings.RATE_LIMIT_BACKEND.lower() == "redis" or settings.is_upstash_configured:
         return RedisRateLimiter(
             requests_per_minute=settings.RATE_LIMIT_PER_MINUTE,

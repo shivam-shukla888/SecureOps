@@ -65,12 +65,21 @@ async def lifespan(app_instance: FastAPI):
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routes.agents import router as agents_router
+from app.routes.evaluations import router as evaluations_router
+from app.routes.benchmarks import router as benchmarks_router
+
 app = FastAPI(
     title="SecureOps Gateway API",
     description="Enterprise Multi-Tenant AI Gateway, Deterministic Policy Engine, Hashed Credential Manager & Secure Executor",
     version="5.0.0",
     lifespan=lifespan,
 )
+
+app.include_router(agents_router)
+app.include_router(evaluations_router)
+app.include_router(benchmarks_router)
+
 
 # Enable CORS Middleware for Frontend Dashboard Integration & OPTIONS Preflight
 app.add_middleware(

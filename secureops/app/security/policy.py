@@ -109,3 +109,42 @@ class DeterministicPolicyEngine:
             override_applied=override_applied,
             reason=reason_str,
         )
+
+    @staticmethod
+    def evaluate_agent_tool_call(
+        tool_name: str,
+        arguments: dict,
+        allowed_tools: list,
+        agent_id: str,
+        tenant_id: str,
+        user_id: str = "anonymous",
+    ) -> dict:
+        from app.adapters.base import NormalizedToolCall
+        from app.security.tool_gateway import tool_security_gateway
+        from app.security.risk_scorer import risk_scoring_engine
+
+        tc = NormalizedToolCall(tool_name=tool_name, arguments=arguments)
+        decision_str, reason, risk_contrib = tool_security_gateway.validate_tool_call(
+            tool_call=tc,
+            allowed_tools=allowed_tools,
+            agent_id=agent_id,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
+
+        score, level = risk_scoring_engine.calculate_risk(
+            tool_decision=decision_str,
+            tool_risk_contrib=risk_contrib,
+            has_dangerous_args=(decision_str == "BLOCK" and "Violation" in reason),
+        )
+
+        return {
+            "decision": decision_str,
+            "reason": reason,
+            "risk_score": score,
+            "risk_level": level,
+            "tool_name": tool_name,
+            "agent_id": agent_id,
+            "tenant_id": tenant_id,
+        }
+

@@ -5,7 +5,8 @@ from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.config import Settings, validate_production_config
+from app.config import settings, Settings, validate_production_config
+
 from app.security.rate_limit import RedisRateLimiter, InMemoryRateLimiter
 from app.audit.repository import InMemoryAuditRepository, PostgresAuditRepository
 from app.approval.repository import InMemoryApprovalRepository, PostgresApprovalRepository
@@ -106,10 +107,12 @@ def test_prod_8_database_connection_failure_detection():
 
 def test_prod_9_redis_connection_failure_detected_in_production():
     limiter = RedisRateLimiter(redis_url="redis://invalid-host-9999:6379/0", requests_per_minute=2)
-    with patch("app.config.settings.ENVIRONMENT", "production"):
+    with patch.object(settings, "ENVIRONMENT", "production"), patch("app.security.rate_limit.settings.ENVIRONMENT", "production"):
         with pytest.raises((HTTPException, RuntimeError)) as exc_info:
             asyncio.run(limiter.is_rate_limited("user_test_redis_prod"))
         assert exc_info.value.status_code == 503 if isinstance(exc_info.value, HTTPException) else True
+
+
 
 
 def test_prod_10_tenant_isolation_remains_intact():

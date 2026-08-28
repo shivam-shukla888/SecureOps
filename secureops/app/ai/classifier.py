@@ -47,10 +47,21 @@ class RequestClassifier:
             )
 
         # 3. Both Failed: Fail Closed
-        fail_closed_result = ClassifierResult(
-            intent=IntentEnum.UNKNOWN,
-            resource="unknown",
-            risk=RiskEnum.HIGH,
-            requires_approval=True,
+        return (
+            ClassifierResult(
+                intent=IntentEnum.UNKNOWN,
+                resource=user_request,
+                risk=RiskEnum.HIGH,
+                requires_approval=True,
+            ),
+            False,
+            "none",
+            True,
         )
-        return fail_closed_result, False, "none", True
+
+    async def classify_intent(self, user_request: str, user_id: str = "anonymous"):
+        res, success, provider, fallback = await self.classify(user_request)
+        return res
+
+
+intent_classifier = RequestClassifier()
