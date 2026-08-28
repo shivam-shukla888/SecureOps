@@ -1,168 +1,101 @@
-# SecureOps Enterprise AI Gateway & Security Control Layer (Phase 5)
+# SecureOps — Backend Engine & Adversarial Benchmark Core
 
-SecureOps is a production-grade Enterprise AI Request Gateway, Multi-Provider Fallback System, Deterministic Security Policy Engine, Multi-Tenant Control Plane, and Secure Tool Executor built with Python and FastAPI.
+SecureOps is a production-grade **Universal AI Agent Security Gateway, Tool Execution Firewall & Adversarial Benchmark Engine** built with Python, FastAPI, async SQLAlchemy, PostgreSQL, and Redis.
 
 ---
 
-## Architecture & Security Pipeline
+## Core Security Pipeline
 
 ```text
-Client / Agent (Bearer Key)
+Client / External Agent (Bearer Key)
   ↓
-Hashed API Credential Authentication & Tenant Context (tenant_id, user_id, role)
+Hashed API Credential Authentication & Server-Side Tenant Context (TenantUserContext)
   ↓
-Input Validation & Size Guard (Payload Limit, Character Limit, Parameter Stripping)
+Input Validation & Size Guard (Payload Cap: 1MB, Character Limit: 4000)
   ↓
-AI Provider Chain (Gemini 2.5 Flash -> Groq Fallback)
+AI Provider Classification Chain (Gemini 2.5 Flash -> Groq Fallback -> Fail-Closed)
   ↓
-Deterministic Policy Engine (Canonical Risk Matrix & Anti-Downgrade Rules)
+Deterministic Policy Engine (Canonical Risk Matrix & Anti-Downgrade Enforcement)
   ↓
-Human-In-The-Loop Approval Engine (Time-bound Tickets & Self-Approval Prevention)
+Human-In-The-Loop Approval Engine (Time-bound Single-Use Tickets & HMAC Webhooks)
   ↓
-Tool Permission Engine & Server-Side Allowlist Validation
+Tool Security Gateway (Allowlist Verification, Regex Shell Escape, Path Traversal & SSRF Filters)
   ↓
-Secure Execution Engine (Tenant Data Isolation, SSRF Guard, Secret Isolation, Timeout Control)
+Secure Execution Engine (Tenant Data Isolation, Timeout Control, Secret Masking)
   ↓
-SIEM & Audit Logging (Redacted JSON, PostgreSQL Persistence, Console/Webhook Exporters)
+SIEM & Audit Logging (PostgreSQL asyncpg Persistence, Redacted JSON Log, Console/Webhook Exporters)
 ```
 
 ---
 
-## Phase 5 Core Features
+## Capabilities & Subsystems
 
-1. **Multi-Tenancy & Tenant Data Isolation**: All persisted state (`audit_logs`, `approval_tickets`, `execution_records`, `idempotency_records`) is strictly partitioned by `tenant_id`. Cross-tenant access is blocked with `HTTP 403 Forbidden`.
-2. **Role-Based Access Control (RBAC)**: Server-side authorization enforcing 5 roles (`OWNER`, `ADMIN`, `APPROVER`, `OPERATOR`, `VIEWER`). Users cannot self-assign privileges.
-3. **Hashed Credential Management**: API keys are securely hashed (`SHA-256`). Supports tenant-scoped credential creation, key rotation, and instant revocation.
-4. **Real Safe Tool Integration**: Safe read-only `DocumentServiceAdapter` for tenant-isolated document searches.
-5. **SIEM Exporters & Security Events**: Dedicated security event pipeline (`AUTH_FAILURE`, `PROMPT_INJECTION`, `SSRF_BLOCK`, etc.) with asynchronous `ConsoleSIEMExporter` and `WebhookSIEMExporter` adapters.
-6. **Tenant Dashboard & Governance APIs**: Endpoints `GET /v1/approvals`, `GET /v1/audit/events`, and `GET /v1/dashboard/summary` providing real-time tenant metrics.
+1. **Universal Agent Adapters (`app/adapters/`)**:
+   - `OpenAICompatibleAgentAdapter`: Connects OpenAI, Groq, vLLM, LocalAI, Ollama, and Mistral agents with dynamic secret management and safe mocked fallback.
+   - `GenericHTTPAgentAdapter`: Connects internal enterprise REST agents (LangChain, CrewAI, AutoGen) with SSRF checks, open redirect blocking (`follow_redirects=False`), and 2MB response caps.
+   - `SimulatedAgentAdapter`: Offline sandbox simulator for safe deterministic test runs.
+2. **Standard Adversarial Benchmark Engine (`security-baseline-v1`)**:
+   - 20 baseline security scenarios across 6 categories (Prompt Injection, Jailbreak, Tool Abuse, Data Exfiltration, Network SSRF, Command Injection, Privilege Escalation).
+   - **Adaptive Testing Loop**: Feedback mechanism executing targeted multi-stage attack variants (`PI-002`, `MA-002`, `SSRF-002`, `PE-002`) bounded to `MAX_ADAPTIVE_REQUESTS = 10`.
+3. **Multi-Tenancy & Tenant Data Isolation**: All persisted models (`agents`, `agent_evaluations`, `agent_benchmarks`, `benchmark_findings`, `audit_logs`, `approval_tickets`, `idempotency_records`) are strictly partitioned by `tenant_id`.
+4. **Role-Based Access Control (RBAC)**: Server-side authorization enforcing 5 roles (`OWNER`, `ADMIN`, `APPROVER`, `OPERATOR`, `VIEWER`).
+5. **Hashed Credential Management**: API keys are securely hashed (`SHA-256`) and never stored in plaintext.
+6. **PostgreSQL Migrations (Alembic)**: Revisions `001_initial_tables` $\rightarrow$ `002_production_tables` $\rightarrow$ `003_agent_security_gateway` $\rightarrow$ `004_agent_benchmarks` (`head`).
 
 ---
 
 ## Directory Structure
 
-```
+```text
 secureops/
+├── alembic/                 # Alembic migration scripts (001 -> 004 head)
 ├── app/
-│   ├── main.py              # FastAPI app & endpoints (/v1/requests, /v1/executions, /v1/approvals, /v1/audit, /v1/dashboard, /v1/credentials)
+│   ├── main.py              # FastAPI app & endpoints
 │   ├── config.py            # Startup security configuration validator
-│   ├── schemas/
-│   │   ├── request.py       # Input validation & forbidden parameter stripping
-│   │   ├── decision.py      # Classification & gateway response schemas
-│   │   ├── approval.py      # HITL approval request & result schemas
-│   │   ├── execution.py     # Tool execution request & response schemas
-│   │   └── credential.py    # Credential management schemas
-│   ├── security/
-│   │   ├── auth.py          # Hashed Bearer token validation & tenant context attachment
-│   │   ├── rbac.py          # RoleEnum & server-side require_role dependency
-│   │   ├── credentials.py   # APICredentialRepository (hashing, rotation, revocation)
-│   │   ├── validation.py    # Size limits (413) & text length checks
-│   │   ├── policy.py        # Deterministic policy engine & anti-downgrade rules
-│   │   ├── rate_limit.py    # Memory & Redis sliding-window rate limiters (429)
-│   │   ├── hmac.py          # HMAC-SHA256 signature verification & timestamp replay protection
-│   │   ├── secrets.py       # SecretProvider isolation with key allowlist
-│   │   ├── network.py       # SSRF protection & outbound host allowlist
-│   │   ├── idempotency.py   # Idempotency-Key caching manager (tenant-scoped)
-│   │   └── headers.py       # Security headers middleware (HSTS, Nosniff, Frame Options)
-│   ├── ai/
-│   │   ├── classifier.py    # Gemini -> Groq fallback classifier orchestrator
-│   │   ├── prompts.py       # System prompt for untrusted input classification
-│   │   └── providers/
-│   │       ├── base.py      # Abstract AI provider interface
-│   │       ├── gemini.py    # Gemini 2.5 Flash provider
-│   │       └── groq.py      # Groq Llama-3.3-70b provider
-│   ├── tools/
-│   │   ├── base.py          # ToolDefinition dataclass
-│   │   ├── schemas.py       # Pydantic tool input schemas (extra="forbid", injection checks)
-│   │   ├── registry.py      # Deterministic ToolRegistry mapping
-│   │   ├── permissions.py   # Server-side tool permission engine & ticket binding
-│   │   └── integrations/
-│   │       └── document_service.py # Real safe read-only DocumentServiceAdapter
-│   ├── db/
-│   │   ├── session.py       # Async SQLAlchemy engine
-│   │   ├── models.py        # AuditLogModel and ApprovalTicketModel
-│   │   └── safe_query.py    # SafeDatabaseQueryAdapter (parameterized SQL & tenant scoping)
-│   ├── approval/
-│   │   ├── repository.py    # Multi-tenant approval ticket repository
-│   │   └── manager.py       # HITL approval manager & self-approval prevention
-│   ├── audit/
-│   │   ├── logger.py        # Redacted JSON logger
-│   │   ├── repository.py    # Multi-tenant audit repository
-│   │   ├── metrics.py       # Application metrics tracker
-│   │   ├── security_events.py # SecurityEvent model & security event types
-│   │   └── siem.py          # Console & Webhook SIEM exporters
-│   ├── n8n/
-│   │   └── webhook.py       # Outbound HMAC-signed n8n notification client
-│   └── executor/
-│       └── dispatcher.py    # Tool execution dispatcher with timeout control
+│   ├── adapters/            # Universal Agent Adapters (OpenAI, HTTP, Simulated)
+│   ├── routes/              # Agent Registry, Evaluations & Benchmark Routers
+│   ├── schemas/             # Request, Decision, Approval, Execution, Agent Schemas
+│   ├── security/            # Policy Engine, Tool Gateway, Auth, RBAC, SSRF, Rate Limit
+│   │   └── benchmarks/      # Adversarial Benchmark Engine & Scorecard
+│   ├── ai/                  # AI Providers (Gemini, Groq) & Classifier
+│   ├── approval/            # HITL Approval Ticket Manager
+│   ├── audit/               # Audit Logger, Metrics & SIEM Exporters
+│   ├── db/                  # PostgreSQL Models & Async Session Factory
+│   └── executor/            # Tool Dispatcher & Safe Sandbox
+├── docs/                    # Architecture, Integration & Benchmark Documentation
 ├── scripts/
-│   ├── secret_scan.py       # Repository secret scanner script
-│   ├── demo.py              # Scenario demo script
-│   ├── e2e_demo.py          # Real end-to-end 7-scenario validation script
-│   └── benchmark.py         # Micro-benchmark script
-├── tests/                   # 88-test regression suite covering all security controls
-│   ├── conftest.py
-│   ├── test_adversarial.py  # 19 automated attack case tests
-│   ├── test_phase5_multitenancy_rbac.py # Multi-tenancy, RBAC, & credential tests
-│   ├── test_api.py
-│   ├── test_approval_binding.py
-│   ├── test_approvals.py
-│   ├── test_auth.py
-│   ├── test_fallback.py
-│   ├── test_hmac_replay.py
-│   ├── test_idempotency_and_timeout.py
-│   ├── test_input_sanitization.py
-│   ├── test_persistence_rate_limit.py
-│   ├── test_policy.py
-│   ├── test_prompt_injection.py
-│   ├── test_redis_integration.py
-│   ├── test_ssrf_and_secrets.py
-│   ├── test_tool_permissions.py
-│   └── test_validation.py
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-├── README.md
-├── PRODUCT.md
-├── DEMO.md
-├── PERFORMANCE.md
-├── ARCHITECTURE.md
-├── SECURITY.md
-└── SECURITY_SCORECARD.md
+│   ├── demo_universal_agent.py # End-to-end agent evaluation demo script
+│   └── secret_scan.py       # Hardcoded secret scanner
+└── tests/                   # 147+ Automated Pytest Security & Regression Tests
 ```
 
 ---
 
-## Quickstart & Commands
+## Verification & Execution Commands
 
-### 1. Run Automated Test Suite (88 Tests)
+### 1. Run Automated Test Suite (147+ Tests)
 
 ```bash
 cd secureops
 python -m pytest -v
 ```
 
-### 2. Run Secret Scan
+### 2. Run Hardcoded Secret Scan
 
 ```bash
 python scripts/secret_scan.py
 ```
 
-### 3. Run E2E Production Demo
+### 3. Run Universal Agent Benchmark Demo
 
 ```bash
-python scripts/e2e_demo.py
+python scripts/demo_universal_agent.py
 ```
 
-### 4. Run Micro-Benchmark
+### 4. Start Development Gateway Server
 
 ```bash
-python scripts/benchmark.py
+python -m uvicorn app.main:app --reload --port 8000
 ```
-
-### 5. Launch Local Docker Compose Environment
-
-```bash
-cd ..
-docker-compose up --build
-```
+- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **Health Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)

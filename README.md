@@ -1,43 +1,57 @@
-# SecureOps — Enterprise AI Security Gateway & Zero-Trust Tool Firewall
+# SecureOps — Universal AI Agent Security Gateway & Adversarial Benchmark Engine
 
 [![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-emerald.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-cyan.svg)](https://react.dev/)
 [![Security Audit](https://img.shields.io/badge/Security--Audit-100%25%20PASS-brightgreen.svg)]()
+[![Automated Tests](https://img.shields.io/badge/Tests-147%20Passed-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
-**SecureOps** is an enterprise-grade AI Security Gateway designed to control and govern Large Language Model (LLM) agent interactions with internal databases, tools, and document repositories.
+**SecureOps** is an enterprise-grade, provider-agnostic **AI Agent Security Gateway, Tool Execution Firewall & Adversarial Benchmark Engine**.
 
-It guarantees **Zero LLM Autonomy**: the AI provider never acts as the final authorization authority. Every request undergoes multi-provider classification, server-side deterministic policy enforcement, strict tenant isolation, and optional Human-In-The-Loop (HITL) approval routing before any execution occurs.
+It enforces **Zero LLM Autonomy**: language models never act as final authorization authorities. Every prompt, execution request, and tool invocation is filtered through multi-provider classification, server-side deterministic policy enforcement, strict tenant isolation, deep argument inspection, and Human-In-The-Loop (HITL) approval gates before execution.
+
+Additionally, SecureOps provides the **Adversarial Benchmark Engine (`security-baseline-v1`)** with a bounded adaptive testing loop to security-test real external AI agents (OpenAI, Groq, vLLM, LangChain, CrewAI, AutoGen, Custom REST) across 20 attack categories.
 
 ---
 
 ## Key Capabilities
 
-- 🛡️ **Deterministic Policy Engine**: Overrides LLM prompt injections or hallucinations. Destructive operations (e.g., `DELETE_DATA`, `UPDATE_DATA`) unconditionally require human approval regardless of what the LLM outputs.
-- 🔄 **3-Tier AI Provider Fallback Chain**: Primary AI Provider -> Google Gemini (`gemini-3.5-flash`) -> Groq (`openai/gpt-oss-20b`). Automatically fails closed (`UNKNOWN` / `HIGH` risk -> `BLOCK`) if all providers are unavailable.
-- 🏢 **Authoritative Server-Side Multi-Tenancy**: Tenant identity (`tenant_id`) is anchored strictly in authenticated credentials (`TenantUserContext`) and server-side token state. Natural language prompts or client parameters can never override tenant scope.
-- 📄 **Real Read-Only Document Service**: Scoped document search querying tenant filesystem repositories (`test_documents/<tenant_id>/`) with path traversal protection and stop-word keyword filtering.
-- ✋ **Human-In-The-Loop (HITL) Approval Engine**: Time-bound, single-use approval tickets with HMAC-signed outbound webhook notifications (e.g., n8n integration).
-- 🌐 **SSRF & Secret Isolation**: Egress host allowlisting, private IP range blocking, cloud metadata URL protection (`169.254.169.254`), and isolated credential management.
-- 📊 **Enterprise React Dashboard**: High-density glassmorphism frontend built with Vite, TypeScript, and Tailwind CSS for real-time threat monitoring, audit logs, and SIEM security events.
+- 🛡️ **Deterministic Policy Engine**: Enforces canonical anti-downgrade matrices. Destructive actions (e.g. `delete_data`, `wipe_database`) unconditionally require human approval regardless of LLM output or client prompt manipulation.
+- 🤖 **Universal Agent Compatibility**:
+  - **`OpenAICompatibleAgentAdapter`**: Connects OpenAI, Groq, vLLM, LocalAI, Ollama, and Mistral agents with dynamic secret resolution and safe mocked fallback.
+  - **`GenericHTTPAgentAdapter`**: Connects enterprise internal REST agents (LangChain, LangGraph, CrewAI, AutoGen) with SSRF protection, open redirect blocking (`follow_redirects=False`), 2MB payload caps, and production HTTPS enforcement.
+  - **`SimulatedAgentAdapter`**: Offline sandbox simulator for safe deterministic test execution.
+- 🎯 **Standard Adversarial Benchmark Engine (`security-baseline-v1`)**:
+  - 20 baseline security attack scenarios across 6 domains (Prompt Injection, Jailbreaks, System Prompt Extraction, Tool Abuse, PII Exfiltration, SSRF, Path Traversal, Command Injection, Privilege Escalation).
+  - **Adaptive Feedback Loop**: Triggers targeted multi-stage attack variants (`PI-002`, `MA-002`, `SSRF-002`, `PE-002`) within strict bounds (`MAX_ADAPTIVE_REQUESTS = 10`).
+- 🔧 **Tool Security Gateway**:
+  - Normalizes tool calls (`NormalizedToolCall`) across all agent architectures.
+  - Enforces per-agent tool allowlists and deep regex inspection against shell command injection, path traversal (`../`), and SSRF destinations.
+- 🏢 **Authoritative Server-Side Multi-Tenancy**:
+  - All database queries, audit logs, approval tickets, rate limits, and credentials are partitioned by `tenant_id` via `TenantUserContext`. Cross-tenant access is blocked with `HTTP 403 Forbidden`.
+- 🗄️ **PostgreSQL & Redis Dual-Engine Persistence**:
+  - PostgreSQL persistence with async SQLAlchemy + `asyncpg` and Alembic migrations (`001_initial_tables` $\rightarrow$ `004_agent_benchmarks`).
+  - Redis / Upstash sliding-window token-bucket rate limiter with automatic in-memory fallback.
+- ✋ **Human-In-The-Loop (HITL) Approvals**: Time-bound, single-use approval tickets with HMAC-SHA256 webhooks (e.g. n8n integration).
+- 📊 **Enterprise Glassmorphism Dashboard**: Real-time React + Vite + TypeScript frontend for threat monitoring, live agent scoring, audit logs, and SIEM security events.
 
 ---
 
 ## High-Level System Architecture
 
 ```text
-                               SecureOps Gateway Architecture
+                                SecureOps Gateway Architecture
 
- [ User / Frontend Client ]
-            │
-            │  1. HTTP POST /v1/requests (Bearer API Key)
-            v
+ [ Client / Agent / Frontend ]
+             │
+             │  1. HTTP Request (Bearer API Key / Tenant Context)
+             v
  ┌────────────────────────────────────────────────────────────────────────┐
  │                      FastAPI Gateway Pipeline                          │
  │                                                                        │
  │  [ Bearer Auth & Tenant Resolution ] ──> TenantUserContext (Server-side)│
- │  [ Rate Limiter & Payload Validator ] ──> Max 1MB / Max 4000 Chars     │
+ │  [ Rate Limiter & Payload Guard ]   ──> Max 1MB / Max 4000 Chars       │
  │                                                                        │
  │  [ AI Classification Chain ]                                           │
  │     ├── Primary AI Provider (OpenAI / OpenRouter)                      │
@@ -52,20 +66,22 @@ It guarantees **Zero LLM Autonomy**: the AI provider never acts as the final aut
            │                                                 │
            v (If ALLOW)                                      v (If REQUIRE_APPROVAL)
  ┌───────────────────────────┐                     ┌───────────────────────────┐
- │   Tool Execution Engine   │                     │   HITL Approval Ticket    │
+ │   Tool Security Gateway   │                     │   HITL Approval Ticket    │
  │                           │                     │                           │
- │ ├── DocumentServiceAdapter│                     │ ├── HMAC Signed n8n Webhook│
- │ ├── Read-Only Scoped Index│                     │ ├── Time-bound Expiration │
- │ └── Path Traversal Check  │                     │ └── Security Officer Review│
- └─────────────┬─────────────┘                     └─────────────┬─────────────┘
+ │ ├── Tool Allowlist Check  │                     │ ├── HMAC Signed Webhook   │
+ │ ├── SSRF / Private IP Blk │                     │ ├── Time-bound Expiry     │
+ │ ├── Path Traversal Filter │                     │ └── Security Officer Gate │
+ │ └── Shell Escape Filter   │                     └─────────────┬─────────────┘
+ └─────────────┬─────────────┘                                   │
                │                                                 │
                └────────────────────────┬────────────────────────┘
                                         v
                             ┌───────────────────────┐
                             │ Audit & SIEM Logging  │
                             │                       │
-                            │ ├── Memory/PG Storage │
-                            │ └── Security Events   │
+                            │ ├── PostgreSQL / async│
+                            │ ├── Security Events   │
+                            │ └── Redacted JSON Log │
                             └───────────────────────┘
 ```
 
@@ -75,24 +91,31 @@ It guarantees **Zero LLM Autonomy**: the AI provider never acts as the final aut
 
 ```text
 SecureOps/
-├── secureops/                 # FastAPI Backend Engine
+├── secureops/                 # FastAPI Backend Engine & Benchmark Core
+│   ├── alembic/               # Database Migration Versions (001 -> 004)
+│   │   └── versions/          # 003_agent_security_gateway.py, 004_agent_benchmarks.py
 │   ├── app/
-│   │   ├── main.py            # Gateway Routing & API Endpoints
-│   │   ├── config.py          # Pydantic BaseSettings & Environment Config
-│   │   ├── ai/                # AI Providers (Gemini, Groq, Primary) & Classifier
+│   │   ├── main.py            # Gateway Pipeline, Middleware & API Endpoints
+│   │   ├── config.py          # Settings & Production Config Validation
+│   │   ├── adapters/          # Universal Agent Adapters (OpenAI, HTTP, Simulated)
+│   │   ├── routes/            # Agents, Evaluations, Benchmarks, Summary Endpoints
+│   │   ├── schemas/           # Pydantic Schemas (Request, Decision, Agent, Approval)
+│   │   ├── security/          # Policy Engine, Tool Gateway, Auth, RBAC, SSRF, Rate Limit
+│   │   │   └── benchmarks/    # Benchmark Engine, Scorecard, Adaptive Testing
+│   │   ├── ai/                # AI Providers (Gemini, Groq) & Fallback Classifier
 │   │   ├── approval/          # HITL Approval Ticket Lifecycle Manager
-│   │   ├── audit/             # Audit Logging & SIEM Event Recording
-│   │   ├── executor/          # Dispatcher & Server-Side Execution Engine
-│   │   ├── security/          # Auth, RBAC, Policy Engine, Rate Limiter, SSRF
-│   │   └── tools/             # Tool Registry, Schemas & DocumentServiceAdapter
-│   ├── test_documents/        # Isolated Tenant Document Repository
-│   │   ├── tenant_default/    # Architecture & Governance Docs
-│   │   ├── tenant_acme/       # Acme Confidential Docs
-│   │   └── tenant_globex/     # Globex Financial Docs
-│   ├── tests/                 # 102 Backend Pytest Security & Integration Tests
-│   └── scripts/               # Secret Scanner (`secret_scan.py`)
+│   │   ├── audit/             # Audit Logging, Metrics & SIEM Security Events
+│   │   ├── db/                # PostgreSQL Models & Async Session Factory
+│   │   ├── executor/          # Tool Dispatcher & Execution Sandbox
+│   │   └── tools/             # Tool Registry & Document Service Adapter
+│   ├── docs/                  # Architecture, Integration & Benchmark Documentation
+│   ├── scripts/
+│   │   ├── demo_universal_agent.py # End-to-end agent evaluation demo
+│   │   └── secret_scan.py     # Hardcoded secret scanner
+│   ├── test_documents/        # Isolated Tenant Document Repositories
+│   └── tests/                 # 147+ Automated Pytest Security & Regression Tests
 │
-├── frontend/                  # React + Vite + TypeScript Frontend
+├── frontend/                  # React + Vite + TypeScript Dashboard
 │   ├── src/
 │   │   ├── components/        # Layout & Glassmorphism Dashboard Views
 │   │   ├── context/           # Tab-Scoped AuthContext (sessionStorage)
@@ -100,8 +123,10 @@ SecureOps/
 │   │   └── types/             # TypeScript API Interfaces
 │   └── package.json
 │
-├── SECURITY_QA_REPORT.md      # Adversarial Audit Report (50 Security Categories)
-└── SECURITY_TEST_MATRIX.md    # Detailed Defense & Test Evaluation Matrix
+├── docker-compose.yml         # Containerized Infrastructure (PostgreSQL, Redis)
+├── ARCHITECTURE.md            # Comprehensive Architectural Specification
+├── SECURITY_SCORECARD.md      # Category Risk Breakdown & Defense Matrix
+└── README.md                  # Project Overview & Setup Guide
 ```
 
 ---
@@ -109,14 +134,14 @@ SecureOps/
 ## Quickstart Guide
 
 ### Prerequisites
-
 - **Python**: 3.11 or higher
 - **Node.js**: v18 or higher
-- **Git**
+- **PostgreSQL**: (e.g. Supabase, AWS RDS, or local Docker)
+- **Redis**: (optional: Upstash REST or local Redis)
 
 ---
 
-### Backend Setup (FastAPI)
+### Backend Setup (FastAPI Gateway)
 
 1. **Navigate to the backend directory**:
    ```bash
@@ -126,7 +151,7 @@ SecureOps/
 2. **Create and activate a virtual environment**:
    ```bash
    python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
    ```
 
 3. **Install dependencies**:
@@ -135,7 +160,6 @@ SecureOps/
    ```
 
 4. **Configure environment variables**:
-   Copy `.env.example` to `.env` and add your provider API keys:
    ```bash
    cp .env.example .env
    ```
@@ -143,24 +167,35 @@ SecureOps/
    ```env
    API_KEY=secops_live_your_secret_key
    ENVIRONMENT=development
+   DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/secureops
+   REDIS_URL=redis://localhost:6379/0
    GEMINI_API_KEY=your_gemini_key
-   GEMINI_MODEL=gemini-3.5-flash
    GROQ_API_KEY=your_groq_key
-   GROQ_MODEL=openai/gpt-oss-20b
+   CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173
    ```
 
-5. **Run the test suite**:
+5. **Apply database migrations**:
+   ```bash
+   alembic upgrade head
+   ```
+
+6. **Run the security verification & test suite**:
    ```bash
    python -m pytest -v
    python scripts/secret_scan.py
    ```
 
-6. **Start the API server**:
+7. **Start the API server**:
    ```bash
    python -m uvicorn app.main:app --reload --port 8000
    ```
    - **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
    - **Health Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+
+8. **Run the Universal Agent Benchmark Demo**:
+   ```bash
+   python scripts/demo_universal_agent.py
+   ```
 
 ---
 
@@ -176,21 +211,11 @@ SecureOps/
    npm install
    ```
 
-3. **Run unit tests**:
-   ```bash
-   npx vitest run
-   ```
-
-4. **Start the development server**:
+3. **Start the development server**:
    ```bash
    npm run dev
    ```
-   - **Frontend App**: [http://localhost:3000](http://localhost:3000)
-
-5. **Build for production**:
-   ```bash
-   npm run build
-   ```
+   - **Frontend Dashboard**: [http://localhost:5173](http://localhost:5173) (or `http://localhost:3000`)
 
 ---
 
@@ -198,7 +223,7 @@ SecureOps/
 
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :---: |
-| `GET` | `/health` | Server health check | No |
+| `GET` | `/health` | Server liveness check | No |
 | `GET` | `/ready` | Gateway & subsystem readiness check | No |
 | `POST` | `/v1/requests` | Primary AI Gateway classification & execution | Yes (Bearer) |
 | `POST` | `/v1/executions` | Execution Center direct tool execution | Yes (Bearer) |
@@ -208,17 +233,32 @@ SecureOps/
 | `GET` | `/v1/audit/events` | Query tenant audit log history | Yes (Bearer) |
 | `GET` | `/v1/security/events` | Query SIEM security threat events | Yes (Bearer) |
 | `GET` | `/v1/dashboard/summary` | Query tenant dashboard metrics summary | Yes (Bearer) |
-| `POST` | `/v1/credentials` | Generate new API credential (Admin/Owner) | Yes (Admin+) |
+| `POST` | `/v1/credentials` | Generate new API credential | Yes (Admin+) |
+| `GET` / `POST` | `/v1/agents` | List or register external AI agents | Yes (Bearer) |
+| `GET` / `DELETE`| `/v1/agents/{id}` | Retrieve or decommission registered agent | Yes (Bearer) |
+| `POST` | `/v1/agents/{id}/benchmarks` | Run adversarial benchmark against agent | Yes (Bearer) |
+| `GET` | `/v1/benchmarks/{id}` | Retrieve benchmark findings & scorecard | Yes (Bearer) |
+
+---
+
+## Adversarial Benchmark Suite (`security-baseline-v1`)
+
+| Domain | Tests Evaluated | Enforcement Outcome |
+| :--- | :--- | :--- |
+| **Prompt Security** | Direct Injection (`PI-001`), DAN Jailbreak (`JB-001`), System Prompt Extraction (`SE-001`), Context Manipulation (`CM-001`), Indirect Injection (`IDI-001`) | `BLOCK` |
+| **Tool Security** | Tool Abuse (`TA-001`), Unauthorized Invocation (`UT-001`), Malicious Arguments (`MA-001`), Excessive Execution (`ET-001`) | `REQUIRE_APPROVAL` / `BLOCK` |
+| **Data Security** | Secret Extraction (`SL-001`), PII Exfiltration (`DE-001`), Cross-User Access (`CU-001`), Cross-Tenant Access (`CT-001`) | `BLOCK` |
+| **Network Security** | Cloud Metadata SSRF (`SSRF-001`), Private IP / Loopback Blocking | `BLOCK` |
+| **Filesystem / Exec** | Path Traversal (`PT-001`), Shell Command Injection (`CI-001`) | `BLOCK` |
+| **Authorization** | Privilege Escalation (`PE-001`), Client Policy Override Injection (`AB-001`), Rate Limit Spoofing (`RL-001`) | `BLOCK` |
 
 ---
 
 ## Security Verification & Quality Assurance
 
-SecureOps has undergone thorough adversarial QA testing across 50 security dimensions, detailed in [`SECURITY_QA_REPORT.md`](file:///c:/Users/thesh/OneDrive/Desktop/SecureOps/SECURITY_QA_REPORT.md) and [`SECURITY_TEST_MATRIX.md`](file:///c:/Users/thesh/OneDrive/Desktop/SecureOps/SECURITY_TEST_MATRIX.md).
-
-- **Pytest Suite**: **102 / 102 PASS**
-- **Frontend Test Suite**: **3 / 3 PASS**
+- **Automated Test Suite**: **147 / 147 PASS (100%)**
 - **Hardcoded Secret Scanner**: **0 Secrets Detected**
+- **Live HTTP Real-World Socket Verification**: **Verified**
 - **Open Vulnerabilities**: **0 Critical / 0 High**
 
 ---
