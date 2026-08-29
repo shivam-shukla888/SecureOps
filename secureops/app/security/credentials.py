@@ -11,8 +11,18 @@ from app.security.rbac import RoleEnum
 logger = logging.getLogger(__name__)
 
 
+def clean_api_key(raw_key: Optional[str]) -> str:
+    if not raw_key:
+        return ""
+    key = raw_key.strip("\"' \t\r\n")
+    while key.lower().startswith("bearer "):
+        key = key[7:].strip("\"' \t\r\n")
+    return key
+
+
 def hash_api_key(raw_key: str) -> str:
-    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+    cleaned = clean_api_key(raw_key)
+    return hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
 
 
 def generate_api_key(prefix: str = "secops_") -> tuple[str, str]:
@@ -38,8 +48,13 @@ class APICredentialRecord:
     def is_valid(self) -> bool:
         if self.revoked_at is not None:
             return False
-        if self.expires_at is not None and datetime.now(timezone.utc) > self.expires_at:
-            return False
+        if self.expires_at is not None:
+            exp = self.expires_at
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            if now > exp:
+                return False
         return True
 
 
@@ -66,8 +81,9 @@ class APICredentialRepository:
         self.hash_index[test_hash] = rec.credential_id
 
         # Settings API key seed
-        if settings.API_KEY and settings.API_KEY != test_key:
-            env_hash = hash_api_key(settings.API_KEY)
+        clean_env_key = clean_api_key(getattr(settings, "API_KEY", ""))
+        if clean_env_key and clean_env_key != test_key:
+            env_hash = hash_api_key(clean_env_key)
             env_rec = APICredentialRecord(
                 credential_id="cred_env_default",
                 tenant_id="tenant_default",
@@ -80,21 +96,50 @@ class APICredentialRepository:
             self.credentials[env_rec.credential_id] = env_rec
             self.hash_index[env_hash] = env_rec.credential_id
 
-    async def get_by_raw_key(self, raw_key: str) -> Optional[APICredentialRecord]:
-        if not raw_key:
-            return None
+    async def sync_environment_credential_to_db(self):
+        """Persists the configured environment API key into PostgreSQL if reachable and not yet present."""
+        clean_env_key = clean_api_key(getattr(settings, "API_KEY", ""))
+        if not clean_env_key:
+            return
 
-        # Clean token: strip whitespace, quotes, and duplicate Bearer/bearer prefix
-        clean_key = raw_key.strip("\"' \t\r\n")
-        if clean_key.startswith("Bearer ") or clean_key.startswith("bearer "):
-            clean_key = clean_key[7:].strip("\"' \t\r\n")
+        k_hash = hash_api_key(clean_env_key)
+        try:
+            from app.db.session import async_session_factory
+            from app.db.models import APICredentialModel
+            from sqlalchemy import select
+
+            async with async_session_factory() as session:
+                stmt = select(APICredentialModel).where(APICredentialModel.key_hash == k_hash)
+                res = await session.execute(stmt)
+                db_cred = res.scalar_one_or_none()
+
+                if not db_cred:
+                    db_model = APICredentialModel(
+                        credential_id="cred_env_default",
+                        tenant_id="tenant_default",
+                        user_id="admin_user",
+                        name="Environment Master Credential",
+                        key_hash=k_hash,
+                        role="OWNER",
+                        created_at=datetime.now(timezone.utc),
+                    )
+                    session.add(db_model)
+                    await session.commit()
+                    logger.info("Successfully synced environment API credential to PostgreSQL.")
+        except Exception as exc:
+            logger.debug(f"Database sync of environment credential skipped/failed ({exc})")
+
+    async def get_by_raw_key(self, raw_key: str) -> Optional[APICredentialRecord]:
+        clean_key = clean_api_key(raw_key)
+        if not clean_key:
+            return None
 
         k_hash = hash_api_key(clean_key)
         cred_id = self.hash_index.get(k_hash)
 
         # Dynamic fallback check for settings.API_KEY (handles dynamic .env updates)
-        if not cred_id and settings.API_KEY:
-            clean_env_key = settings.API_KEY.strip("\"' \t\r\n")
+        if not cred_id and getattr(settings, "API_KEY", None):
+            clean_env_key = clean_api_key(settings.API_KEY)
             if clean_key == clean_env_key:
                 env_hash = hash_api_key(clean_env_key)
                 env_rec = APICredentialRecord(

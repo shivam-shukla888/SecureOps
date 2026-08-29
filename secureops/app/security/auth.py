@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import Request, HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.security.credentials import credential_repo
+from app.security.credentials import credential_repo, clean_api_key
 from app.security.rbac import TenantUserContext, RoleEnum
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ async def verify_api_key(
     elif raw_header:
         token = raw_header
 
-    if not token:
+    if not token or not token.strip():
         logger.warning("Authentication failed: Missing Authorization header.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -35,12 +35,21 @@ async def verify_api_key(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    clean_token = clean_api_key(token)
+    if not clean_token:
+        logger.warning("Authentication failed: Empty or malformed Bearer token.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or unauthorized API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Look up hashed credential record via token
-    cred_record = await credential_repo.get_by_raw_key(token)
+    cred_record = await credential_repo.get_by_raw_key(clean_token)
 
     if not cred_record:
         logger.warning(
-            f"Authentication failed: Invalid or unauthorized API key (Token Length={len(token.strip())}, Scheme={'Bearer' if credentials else 'RawHeader'})."
+            f"Authentication failed: Invalid or unauthorized API key (Token Length={len(clean_token)}, Scheme={'Bearer' if credentials else 'RawHeader'})."
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -56,4 +65,4 @@ async def verify_api_key(
         credential_id=cred_record.credential_id,
     )
 
-    return token.strip()
+    return clean_token

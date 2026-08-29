@@ -30,7 +30,12 @@ class ApprovalTicket:
         self.expires_at = self.created_at + timedelta(minutes=expiry_minutes)
 
     def is_expired(self) -> bool:
-        return datetime.now(timezone.utc) > self.expires_at
+        if not self.expires_at:
+            return False
+        exp = self.expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) > exp
 
 
 class InMemoryApprovalRepository:

@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import patch, AsyncMock
 from app.schemas.decision import ClassifierResult, IntentEnum, RiskEnum
 
@@ -46,3 +47,61 @@ def test_valid_auth_with_malformed_json_body_returns_400(client, auth_headers):
     )
     assert response.status_code == 400
     assert "Malformed request" in response.json()["error"]["message"]
+
+
+def test_dashboard_summary_valid_api_key_returns_200(client, auth_headers):
+    response = client.get("/v1/dashboard/summary", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tenant_id"] == "tenant_default"
+    assert "requests_today" in data
+    assert "pending_approvals" in data
+    assert "metrics" in data
+
+
+def test_dashboard_summary_missing_auth_returns_401(client):
+    response = client.get("/v1/dashboard/summary")
+    assert response.status_code == 401
+    assert "Missing Authorization header" in response.json()["error"]["message"]
+
+
+def test_dashboard_summary_invalid_api_key_returns_401(client):
+    headers = {"Authorization": "Bearer invalid_unauthorized_token_xyz"}
+    response = client.get("/v1/dashboard/summary", headers=headers)
+    assert response.status_code == 401
+    assert "Invalid or unauthorized API key" in response.json()["error"]["message"]
+
+
+def test_malformed_bearer_tokens_return_401(client):
+    malformed_headers = [
+        {"Authorization": "Bearer"},
+        {"Authorization": "Bearer "},
+        {"Authorization": "Bearer    "},
+        {"Authorization": "Bearer ''"},
+        {"Authorization": 'Bearer ""'},
+        {"Authorization": "Bearer \t\n\r"},
+    ]
+    for headers in malformed_headers:
+        res = client.get("/v1/dashboard/summary", headers=headers)
+        assert res.status_code == 401, f"Expected 401 for header {headers}, got {res.status_code}"
+
+
+@pytest.mark.asyncio
+async def test_dynamically_generated_key_authenticates_dashboard(client):
+    from app.security.credentials import credential_repo
+    from app.security.rbac import RoleEnum
+
+    raw_key, record = await credential_repo.create_credential(
+        tenant_id="tenant_dynamic_test",
+        user_id="dynamic_user_01",
+        name="Dynamic Test Key",
+        role=RoleEnum.ADMIN,
+    )
+
+    headers = {"Authorization": f"Bearer {raw_key}"}
+    res = client.get("/v1/dashboard/summary", headers=headers)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["tenant_id"] == "tenant_dynamic_test"
+    assert body["user_id"] == "dynamic_user_01"
+    assert body["role"] == "ADMIN"

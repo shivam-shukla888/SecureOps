@@ -106,3 +106,16 @@ async def check_db_connectivity() -> bool:
     except Exception as exc:
         logger.warning(f"Database connectivity check failed ({type(exc).__name__})")
         return False
+
+
+async def init_db() -> bool:
+    """Ensures database tables are created if PostgreSQL is reachable."""
+    try:
+        from app.db.models import Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema initialized successfully.")
+        return True
+    except Exception as exc:
+        logger.debug(f"Database initialization skipped/failed: {exc}")
+        return False

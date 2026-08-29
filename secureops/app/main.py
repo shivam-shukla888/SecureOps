@@ -46,8 +46,16 @@ from app.security.redis_service import redis_service
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
-    """Validates configuration presence and logs sanitized startup status."""
+    """Validates configuration presence, initializes DB tables, and logs startup status."""
     validate_production_config()
+
+    # Initialize database tables and sync credentials if PostgreSQL is configured
+    try:
+        from app.db.session import init_db
+        await init_db()
+        await credential_repo.sync_environment_credential_to_db()
+    except Exception as exc:
+        logger.debug(f"Startup DB init skipped: {exc}")
     print("===============================================================================")
     print("                    SECUREOPS ENTERPRISE GATEWAY STARTUP                       ")
     print("===============================================================================")
