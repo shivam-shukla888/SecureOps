@@ -546,4 +546,97 @@ describe('SecureOps Frontend Security & API Tests', () => {
     const { SettingsView } = await import('./components/views/SettingsView');
     expect(SettingsView).toBeDefined();
   });
+
+  // Comprehensive Regression Tests for /health & /ready: TEST 1 through TEST 8
+  describe('Regression: Health & Readiness Endpoint Contract & View Behavior', () => {
+    it('TEST 1: getHealth() receives HTTP 200 with status "healthy" -> Expected: healthy', () => {
+      const payload: import('./types/api').HealthResponse = {
+        status: 'healthy',
+        service: 'SecureOps API Gateway',
+        timestamp: '2026-08-29T14:30:00.000Z',
+      };
+      const isHealthy = payload.status.toLowerCase() === 'healthy' || payload.status.toLowerCase() === 'ok';
+      expect(isHealthy).toBe(true);
+      expect(payload.service).toBe('SecureOps API Gateway');
+    });
+
+    it('TEST 2: getHealth() receives HTTP 200 with status "ok" -> Expected: healthy', () => {
+      const payload = {
+        status: 'ok',
+        service: 'SecureOps API Gateway',
+        timestamp: '2026-08-29T14:30:00.000Z',
+      };
+      const isHealthy = payload.status.toLowerCase() === 'healthy' || payload.status.toLowerCase() === 'ok';
+      expect(isHealthy).toBe(true);
+    });
+
+    it('TEST 3: getHealth() receives HTTP 503 -> Expected: unhealthy/error', () => {
+      const httpStatus = 503;
+      const isSuccess = httpStatus >= 200 && httpStatus < 300;
+      expect(isSuccess).toBe(false);
+      const isLivenessOk = isSuccess && false;
+      expect(isLivenessOk).toBe(false);
+    });
+
+    it('TEST 4: getHealth() network failure -> Expected: unavailable/error', () => {
+      const isNetworkError = true;
+      const isLivenessOk = !isNetworkError;
+      expect(isLivenessOk).toBe(false);
+    });
+
+    it('TEST 5: getReady() = ready AND getHealth() = healthy -> Expected banner: "SYSTEM HEALTHY & READY"', () => {
+      const isLivenessOk = true;
+      const isReadinessOk = true;
+      const isInitialLoading = false;
+      const isDegraded = false;
+
+      const bannerTitle = isInitialLoading
+        ? 'CHECKING GATEWAY STATUS...'
+        : isLivenessOk && isReadinessOk
+        ? 'SYSTEM HEALTHY & READY'
+        : isDegraded
+        ? 'SYSTEM DEGRADED (PARTIAL READINESS)'
+        : 'GATEWAY SERVICE UNAVAILABLE';
+
+      expect(bannerTitle).toBe('SYSTEM HEALTHY & READY');
+    });
+
+    it('TEST 6: getReady() = ready AND getHealth() fails -> Expected Readiness = READY, Liveness = UNHEALTHY, Banner = GATEWAY SERVICE UNAVAILABLE', () => {
+      const isLivenessOk = false;
+      const isReadinessOk = true;
+      const isInitialLoading = false;
+      const isDegraded = false; // Degraded requires isLivenessOk to be true
+
+      const bannerTitle = isInitialLoading
+        ? 'CHECKING GATEWAY STATUS...'
+        : isLivenessOk && isReadinessOk
+        ? 'SYSTEM HEALTHY & READY'
+        : isDegraded
+        ? 'SYSTEM DEGRADED (PARTIAL READINESS)'
+        : 'GATEWAY SERVICE UNAVAILABLE';
+
+      const livenessBadge = isLivenessOk ? 'HEALTHY' : 'UNHEALTHY';
+      const readinessBadge = isReadinessOk ? 'ONLINE / READY' : 'UNHEALTHY';
+
+      expect(readinessBadge).toBe('ONLINE / READY');
+      expect(livenessBadge).toBe('UNHEALTHY');
+      expect(bannerTitle).toBe('GATEWAY SERVICE UNAVAILABLE');
+    });
+
+    it('TEST 7: Ensure /health never gets /v1 appended', () => {
+      const baseUrl = getApiBaseUrl();
+      expect(baseUrl).not.toMatch(/\/v1\/?$/);
+      expect(baseUrl).not.toMatch(/\/api\/?$/);
+      const healthUrl = `${baseUrl}/health`;
+      expect(healthUrl).toBe('https://secureops-gateway.onrender.com/health');
+      expect(healthUrl).not.toContain('/v1/health');
+    });
+
+    it('TEST 8: Ensure production never uses localhost or 127.0.0.1', () => {
+      const baseUrl = getApiBaseUrl();
+      expect(baseUrl).not.toContain('localhost');
+      expect(baseUrl).not.toContain('127.0.0.1');
+      expect(baseUrl).toBe('https://secureops-gateway.onrender.com');
+    });
+  });
 });

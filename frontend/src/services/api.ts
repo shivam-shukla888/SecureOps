@@ -17,11 +17,13 @@ export const getApiBaseUrl = (): string => {
   const isNonLocalhost = isBrowser && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
   if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) {
-    const cleanUrl = envUrl.trim().replace(/['"]/g, '').replace(/\/+$/, '');
+    let cleanUrl = envUrl.trim().replace(/['"]/g, '').replace(/\/+$/, '');
+    // Strip accidental trailing /v1 or /api so root endpoints (/health, /ready) and versioned endpoints (/v1/...) resolve accurately
+    cleanUrl = cleanUrl.replace(/\/+(?:v1|api)\/?$/i, '').replace(/\/+$/, '');
     if ((import.meta.env.PROD || isNonLocalhost) && (cleanUrl.includes('localhost') || cleanUrl.includes('127.0.0.1'))) {
       return 'https://secureops-gateway.onrender.com';
     }
-    return cleanUrl;
+    return cleanUrl || 'https://secureops-gateway.onrender.com';
   }
   return 'https://secureops-gateway.onrender.com';
 };
@@ -95,7 +97,36 @@ async function request<T>(path: string, options: RequestInit = {}, apiKey?: stri
 }
 
 export const api = {
-  getHealth: () => request<HealthResponse>('/health'),
+  getHealth: async (): Promise<HealthResponse> => {
+    const baseUrl = getApiBaseUrl();
+    const url = `${baseUrl}/health`;
+    try {
+      const data = await request<HealthResponse>('/health');
+      if (typeof window !== 'undefined') {
+        console.log(
+          '[SecureOps Health Debug]\n' +
+            `requested URL: ${url}\n` +
+            `HTTP status: 200\n` +
+            `response body: ${JSON.stringify(data)}\n` +
+            `parsed status: ${data?.status}\n` +
+            `error: null`
+        );
+      }
+      return data;
+    } catch (err: any) {
+      if (typeof window !== 'undefined') {
+        console.error(
+          '[SecureOps Health Debug]\n' +
+            `requested URL: ${url}\n` +
+            `HTTP status: ${err?.statusCode || 'failed'}\n` +
+            `response body: ${JSON.stringify(err?.data || null)}\n` +
+            `parsed status: null\n` +
+            `error: ${err?.message || String(err)}`
+        );
+      }
+      throw err;
+    }
+  },
   getReady: () => request<ReadinessResponse>('/ready'),
 
   processRequest: (userId: string, reqText: string, apiKey?: string) =>

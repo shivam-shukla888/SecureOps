@@ -30,6 +30,8 @@ export const HealthView: React.FC = () => {
     queryKey: ['systemHealthLiveness'],
     queryFn: () => api.getHealth(),
     refetchInterval: 10000,
+    retry: 2,
+    staleTime: 5000,
   });
 
   const {
@@ -43,6 +45,8 @@ export const HealthView: React.FC = () => {
     queryKey: ['systemHealthReadiness'],
     queryFn: () => api.getReady(),
     refetchInterval: 10000,
+    retry: 2,
+    staleTime: 5000,
   });
 
   const handleManualRefresh = () => {
