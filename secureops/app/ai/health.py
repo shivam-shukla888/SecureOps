@@ -56,10 +56,20 @@ async def check_provider_health(provider: BaseAIProvider) -> Dict[str, Any]:
         failure_category = type(exc).__name__
         exc_str = str(exc)
         
-        # Safely extract HTTP status code if present (e.g. HTTP 401, HTTP 400)
-        status_match = re.search(r"HTTP[_\s](\d{3})", exc_str)
-        if status_match:
-            status_code_str = f"HTTP_{status_match.group(1)}"
+        # Safely extract HTTP status code and reason if present (e.g. HTTP 401, 400, 429)
+        status_match = re.search(r"(\b[45]\d{2}\b)", exc_str)
+        http_code = status_match.group(1) if status_match else ""
+        
+        if "API_KEY_INVALID" in exc_str or "API key not valid" in exc_str or "invalid_api_key" in exc_str.lower() or http_code == "401":
+            status_code_str = f"HTTP_{http_code or '401'}_INVALID_API_KEY"
+        elif "RESOURCE_EXHAUSTED" in exc_str or "Quota exceeded" in exc_str or "rate_limit" in exc_str.lower() or http_code == "429":
+            status_code_str = f"HTTP_{http_code or '429'}_RATE_LIMITED"
+        elif "PERMISSION_DENIED" in exc_str or http_code == "403":
+            status_code_str = f"HTTP_{http_code or '403'}_PERMISSION_DENIED"
+        elif "NOT_FOUND" in exc_str or "does not exist" in exc_str.lower() or http_code == "404":
+            status_code_str = f"HTTP_{http_code or '404'}_MODEL_NOT_FOUND"
+        elif http_code:
+            status_code_str = f"HTTP_{http_code}"
         elif "Timeout" in failure_category or "timed out" in exc_str.lower():
             status_code_str = "TIMEOUT"
         elif "Safety" in failure_category or "SAFETY" in exc_str:

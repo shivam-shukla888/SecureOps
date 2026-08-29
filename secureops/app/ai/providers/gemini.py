@@ -76,7 +76,7 @@ class GeminiProvider(BaseAIProvider):
         try:
             return await self._classify_via_http(user_request)
         except Exception as http_err:
-            logger.info(f"Gemini HTTP REST call failed: {type(http_err).__name__}; attempting SDK fallback...")
+            logger.info(f"Gemini HTTP REST call returned: {http_err}; attempting SDK fallback...")
 
         # 2. Fallback to google-genai SDK if installed
         try:
@@ -134,8 +134,13 @@ class GeminiProvider(BaseAIProvider):
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, json=payload, headers=headers)
                 if response.status_code != 200:
+                    err_detail = ""
+                    try:
+                        err_detail = response.json().get("error", {}).get("message", "")
+                    except Exception:
+                        pass
                     raise RuntimeError(
-                        f"Gemini API returned HTTP_{response.status_code}"
+                        f"Gemini API returned HTTP_{response.status_code}: {err_detail}"
                     )
 
                 res_json = response.json()

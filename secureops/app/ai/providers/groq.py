@@ -121,8 +121,13 @@ class GroqProvider(BaseAIProvider):
                     response = await client.post(url, json=payload, headers=headers)
 
                 if response.status_code != 200:
+                    err_detail = ""
+                    try:
+                        err_detail = response.json().get("error", {}).get("message", "")
+                    except Exception:
+                        pass
                     raise RuntimeError(
-                        f"Groq API returned HTTP_{response.status_code}"
+                        f"Groq API returned HTTP_{response.status_code}: {err_detail}"
                     )
 
                 res_json = response.json()
