@@ -19,6 +19,8 @@ GROQ_CANDIDATE_MODELS = [
     "mixtral-8x7b-32768",
 ]
 
+_DISCOVERED_GROQ_MODELS: List[str] = []
+
 
 def _normalize_groq_model(raw_model: Optional[str]) -> str:
     if not raw_model:
@@ -68,6 +70,29 @@ class GroqProvider(BaseAIProvider):
     def is_configured(self) -> bool:
         return bool(self.api_key and self.api_key not in DANGEROUS_DUMMY_KEYS)
 
+    async def _discover_models(self) -> List[str]:
+        global _DISCOVERED_GROQ_MODELS
+        if _DISCOVERED_GROQ_MODELS:
+            return _DISCOVERED_GROQ_MODELS
+
+        try:
+            url = "https://api.groq.com/openai/v1/models"
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.get(url, headers=headers)
+                if res.status_code == 200:
+                    models_data = res.json().get("data", [])
+                    discovered = [
+                        m["id"] for m in models_data
+                        if any(k in m.get("id", "").lower() for k in ["llama", "gpt-oss", "qwen", "mixtral", "gemma"])
+                    ]
+                    if discovered:
+                        _DISCOVERED_GROQ_MODELS = discovered
+                        return discovered
+        except Exception as exc:
+            logger.debug(f"Groq model discovery skipped: {exc}")
+        return []
+
     async def classify_request(self, user_request: str) -> ClassifierResult:
         if not self.is_configured:
             raise ValueError("GROQ_API_KEY is not configured.")
@@ -109,6 +134,16 @@ class GroqProvider(BaseAIProvider):
             except Exception as http_err:
                 last_error = http_err
                 logger.info(f"Groq HTTP REST call on {candidate_model} returned: {http_err}")
+
+        # 3. Dynamic model discovery on 404
+        if "404" in str(last_error) or "NOT_FOUND" in str(last_error):
+            discovered = await self._discover_models()
+            for disc_model in discovered:
+                if disc_model not in models_to_try:
+                    try:
+                        return await self._classify_via_http(user_request, disc_model)
+                    except Exception as disc_err:
+                        last_error = disc_err
 
         if last_error:
             raise last_error
