@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, List
 import httpx
 
 from app.config import settings, DANGEROUS_DUMMY_KEYS
@@ -10,14 +10,13 @@ from app.ai.prompts import SYSTEM_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
-# Valid production Gemini models
-VALID_GEMINI_MODELS = {
+# Valid production Gemini models in priority fallback order
+GEMINI_CANDIDATE_MODELS = [
     "gemini-1.5-flash",
-    "gemini-1.5-pro",
     "gemini-2.0-flash",
+    "gemini-1.5-pro",
     "gemini-2.0-flash-lite",
-    "gemini-2.5-flash",
-}
+]
 
 
 def _normalize_gemini_model(raw_model: Optional[str]) -> str:
@@ -26,7 +25,7 @@ def _normalize_gemini_model(raw_model: Optional[str]) -> str:
     cleaned = raw_model.strip("\"' \t\r\n")
     if cleaned.startswith("models/"):
         cleaned = cleaned[7:]
-    if cleaned in VALID_GEMINI_MODELS:
+    if cleaned in GEMINI_CANDIDATE_MODELS:
         return cleaned
     if "2.0" in cleaned or "2-flash" in cleaned:
         return "gemini-2.0-flash"
@@ -72,50 +71,59 @@ class GeminiProvider(BaseAIProvider):
         if not self.is_configured:
             raise ValueError("GEMINI_API_KEY is not configured.")
 
-        # 1. Attempt direct async HTTP REST API call (fastest & most reliable)
-        try:
-            return await self._classify_via_http(user_request)
-        except Exception as http_err:
-            logger.info(f"Gemini HTTP REST call returned: {http_err}; attempting SDK fallback...")
+        # Build candidate list with configured model first
+        models_to_try: List[str] = [self.model]
+        for m in GEMINI_CANDIDATE_MODELS:
+            if m not in models_to_try:
+                models_to_try.append(m)
 
-        # 2. Fallback to google-genai SDK if installed
-        try:
-            from google import genai
-            from google.genai import types
+        last_error = None
+        for candidate_model in models_to_try:
+            # 1. Attempt direct async HTTP REST API call
+            try:
+                return await self._classify_via_http(user_request, candidate_model)
+            except Exception as http_err:
+                last_error = http_err
+                logger.info(f"Gemini HTTP REST call on {candidate_model} returned: {http_err}; checking SDK...")
 
-            client = genai.Client(api_key=self.api_key)
-            prompt = f"User Request: {user_request}"
+            # 2. Fallback to google-genai SDK if installed
+            try:
+                from google import genai
+                from google.genai import types
 
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_CLASSIFICATION_PROMPT,
-                    response_mime_type="application/json",
-                    temperature=0.0,
-                ),
-            )
+                client = genai.Client(api_key=self.api_key)
+                prompt = f"User Request: {user_request}"
 
-            if response and response.text:
-                return parse_and_validate_classifier_json(response.text, provider_name="Gemini")
-        except ImportError:
-            pass
-        except Exception as sdk_err:
-            logger.warning(f"Gemini SDK fallback failed: {type(sdk_err).__name__}")
-            raise sdk_err
+                response = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model=candidate_model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_CLASSIFICATION_PROMPT,
+                        response_mime_type="application/json",
+                        temperature=0.0,
+                    ),
+                )
 
-        raise RuntimeError("Gemini classification failed via both HTTP REST and SDK.")
+                if response and response.text:
+                    return parse_and_validate_classifier_json(response.text, provider_name="Gemini")
+            except ImportError:
+                pass
+            except Exception as sdk_err:
+                last_error = sdk_err
+                logger.info(f"Gemini SDK call on {candidate_model} failed: {type(sdk_err).__name__}")
 
-    async def _classify_via_http(self, user_request: str) -> ClassifierResult:
-        # Use query parameter key which is universally supported across Google API endpoints
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        if last_error:
+            raise last_error
+        raise RuntimeError("Gemini classification failed across all candidate models.")
+
+    async def _classify_via_http(self, user_request: str, model_name: str) -> ClassifierResult:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
         headers = {
             "x-goog-api-key": self.api_key,
             "Content-Type": "application/json",
         }
 
-        # Single unified prompt payload compatible with all Gemini model versions
         payload = {
             "contents": [
                 {
