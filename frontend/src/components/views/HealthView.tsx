@@ -50,9 +50,27 @@ export const HealthView: React.FC = () => {
     refetchReady();
   };
 
-  const isLivenessOk = health?.status === 'healthy' || health?.status === 'ok';
-  const isReadinessOk = ready?.status === 'ready';
-  const isDegraded = ready?.status === 'degraded' || (!isReadinessOk && isLivenessOk);
+  const isLivenessOk = Boolean(
+    !healthError &&
+      health?.status &&
+      (health.status.toLowerCase() === 'healthy' || health.status.toLowerCase() === 'ok')
+  );
+
+  const isReadinessOk = Boolean(
+    !readyError &&
+      ready?.status &&
+      (ready.status.toLowerCase() === 'ready' ||
+        ready.status.toLowerCase() === 'healthy' ||
+        ready.status.toLowerCase() === 'ok')
+  );
+
+  const isInitialLoading = (healthLoading && !health) || (readyLoading && !ready);
+
+  const isDegraded = Boolean(
+    !isInitialLoading &&
+      isLivenessOk &&
+      (ready?.status?.toLowerCase() === 'degraded' || !isReadinessOk)
+  );
 
   const getStatusBadge = (statusStr: string | undefined, loading: boolean) => {
     if (loading) {
@@ -63,7 +81,15 @@ export const HealthView: React.FC = () => {
       );
     }
     const val = statusStr?.toLowerCase();
-    if (val === 'ready' || val === 'healthy' || val === 'ok') {
+    if (val === 'healthy' || val === 'ok') {
+      return (
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          HEALTHY
+        </span>
+      );
+    }
+    if (val === 'ready') {
       return (
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -134,7 +160,9 @@ export const HealthView: React.FC = () => {
       {/* Primary Gateway Status Summary Card */}
       <div
         className={`p-5 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-          isLivenessOk && isReadinessOk
+          isInitialLoading
+            ? 'bg-slate-900/40 border-slate-800 text-slate-300'
+            : isLivenessOk && isReadinessOk
             ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300'
             : isDegraded
             ? 'bg-amber-950/20 border-amber-500/40 text-amber-300'
@@ -146,13 +174,19 @@ export const HealthView: React.FC = () => {
             OPERATIONAL STATUS
           </div>
           <div className="flex items-center gap-2">
-            {isLivenessOk && isReadinessOk && (
+            {isInitialLoading ? (
+              <RefreshCw className="w-6 h-6 text-cyan-400 animate-spin" />
+            ) : isLivenessOk && isReadinessOk ? (
               <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+            ) : isDegraded ? (
+              <AlertTriangle className="w-6 h-6 text-amber-400" />
+            ) : (
+              <XCircle className="w-6 h-6 text-rose-400" />
             )}
-            {isDegraded && <AlertTriangle className="w-6 h-6 text-amber-400" />}
-            {!isLivenessOk && !isDegraded && <XCircle className="w-6 h-6 text-rose-400" />}
             <h2 className="text-xl font-bold tracking-tight uppercase">
-              {isLivenessOk && isReadinessOk
+              {isInitialLoading
+                ? 'CHECKING GATEWAY STATUS...'
+                : isLivenessOk && isReadinessOk
                 ? 'SYSTEM HEALTHY & READY'
                 : isDegraded
                 ? 'SYSTEM DEGRADED (PARTIAL READINESS)'
@@ -160,7 +194,9 @@ export const HealthView: React.FC = () => {
             </h2>
           </div>
           <p className="text-xs text-slate-300 font-sans">
-            {isLivenessOk && isReadinessOk
+            {isInitialLoading
+              ? 'Probing gateway liveness (/health) and infrastructure readiness (/ready)...'
+              : isLivenessOk && isReadinessOk
               ? 'All core services and infrastructure dependencies are operational.'
               : isDegraded
               ? 'Gateway process is responding, but one or more dependencies report degraded status.'
@@ -190,7 +226,7 @@ export const HealthView: React.FC = () => {
                 Application Liveness (/health)
               </h3>
             </div>
-            {getStatusBadge(health?.status, healthLoading)}
+            {getStatusBadge(health?.status, healthLoading && !health)}
           </div>
           <p className="text-[11px] text-slate-400 font-sans">
             Confirms the HTTP gateway process is active, responding to probes, and serving requests.
@@ -218,7 +254,7 @@ export const HealthView: React.FC = () => {
                 Infrastructure Readiness (/ready)
               </h3>
             </div>
-            {getStatusBadge(ready?.status, readyLoading)}
+            {getStatusBadge(ready?.status, readyLoading && !ready)}
           </div>
           <p className="text-[11px] text-slate-400 font-sans">
             Confirms essential backend components (PostgreSQL database, Redis cache, Rate Limiter) are available to safely process traffic.
@@ -257,7 +293,7 @@ export const HealthView: React.FC = () => {
                   <Cpu className="w-4 h-4 text-cyan-400" />
                   <strong className="text-white text-xs">Rate Limiter</strong>
                 </div>
-                {getStatusBadge(ready?.rate_limiter, readyLoading)}
+                {getStatusBadge(ready?.rate_limiter, readyLoading && !ready)}
               </div>
               <p className="text-[11px] text-slate-400 font-sans">
                 Sliding-window token bucket enforcement engine tracking tenant and user request quotas.
@@ -277,7 +313,7 @@ export const HealthView: React.FC = () => {
                   <Database className="w-4 h-4 text-cyan-400" />
                   <strong className="text-white text-xs">PostgreSQL Database</strong>
                 </div>
-                {getStatusBadge(ready?.database, readyLoading)}
+                {getStatusBadge(ready?.database, readyLoading && !ready)}
               </div>
               <p className="text-[11px] text-slate-400 font-sans">
                 Primary persistent store for credentials, security logs, and tenant partition records.
@@ -297,7 +333,7 @@ export const HealthView: React.FC = () => {
                   <Server className="w-4 h-4 text-cyan-400" />
                   <strong className="text-white text-xs">Redis Distributed State</strong>
                 </div>
-                {getStatusBadge(ready?.redis, readyLoading)}
+                {getStatusBadge(ready?.redis, readyLoading && !ready)}
               </div>
               <p className="text-[11px] text-slate-400 font-sans">
                 Distributed in-memory store for idempotency keys, shared rate-limit windows, and session cache.

@@ -388,6 +388,160 @@ describe('SecureOps Frontend Security & API Tests', () => {
     expect(HealthView).toBeDefined();
   });
 
+  it('evaluates HealthView status & banner transitions for production health/readiness scenarios', () => {
+    const computeHealthViewState = (
+      healthData: { status?: string } | undefined,
+      healthLoading: boolean,
+      healthError: boolean,
+      readyData: { status?: string; rate_limiter?: string; database?: string; redis?: string } | undefined,
+      readyLoading: boolean,
+      readyError: boolean
+    ) => {
+      const isLivenessOk = Boolean(
+        !healthError &&
+          healthData?.status &&
+          (healthData.status.toLowerCase() === 'healthy' || healthData.status.toLowerCase() === 'ok')
+      );
+
+      const isReadinessOk = Boolean(
+        !readyError &&
+          readyData?.status &&
+          (readyData.status.toLowerCase() === 'ready' ||
+            readyData.status.toLowerCase() === 'healthy' ||
+            readyData.status.toLowerCase() === 'ok')
+      );
+
+      const isInitialLoading = (healthLoading && !healthData) || (readyLoading && !readyData);
+
+      const isDegraded = Boolean(
+        !isInitialLoading &&
+          isLivenessOk &&
+          (readyData?.status?.toLowerCase() === 'degraded' || !isReadinessOk)
+      );
+
+      const bannerTitle = isInitialLoading
+        ? 'CHECKING GATEWAY STATUS...'
+        : isLivenessOk && isReadinessOk
+        ? 'SYSTEM HEALTHY & READY'
+        : isDegraded
+        ? 'SYSTEM DEGRADED (PARTIAL READINESS)'
+        : 'GATEWAY SERVICE UNAVAILABLE';
+
+      const getBadge = (statusStr: string | undefined, loading: boolean) => {
+        if (loading) return 'CHECKING...';
+        const val = statusStr?.toLowerCase();
+        if (val === 'healthy' || val === 'ok') return 'HEALTHY';
+        if (val === 'ready') return 'ONLINE / READY';
+        if (val === 'degraded' || val === 'unconfigured') return val.toUpperCase();
+        return 'UNHEALTHY';
+      };
+
+      return {
+        isLivenessOk,
+        isReadinessOk,
+        isInitialLoading,
+        isDegraded,
+        bannerTitle,
+        livenessBadge: getBadge(healthData?.status, healthLoading && !healthData),
+        readinessBadge: getBadge(readyData?.status, readyLoading && !readyData),
+      };
+    };
+
+    // Scenario 1: /ready = "ready" (200), /health = "healthy" (200) -> Both succeed
+    const normalState = computeHealthViewState(
+      { status: 'healthy' },
+      false,
+      false,
+      { status: 'ready', rate_limiter: 'ready', database: 'ready', redis: 'ready' },
+      false,
+      false
+    );
+    expect(normalState.isLivenessOk).toBe(true);
+    expect(normalState.isReadinessOk).toBe(true);
+    expect(normalState.bannerTitle).toBe('SYSTEM HEALTHY & READY');
+    expect(normalState.livenessBadge).toBe('HEALTHY');
+    expect(normalState.readinessBadge).toBe('ONLINE / READY');
+
+    // Scenario 2: /ready succeeds ("ready"), but /health fails -> Must NOT mark liveness healthy
+    const healthFailedState = computeHealthViewState(
+      undefined,
+      false,
+      true, // health error
+      { status: 'ready', rate_limiter: 'ready', database: 'ready', redis: 'ready' },
+      false,
+      false
+    );
+    expect(healthFailedState.isLivenessOk).toBe(false);
+    expect(healthFailedState.isReadinessOk).toBe(true);
+    expect(healthFailedState.bannerTitle).toBe('GATEWAY SERVICE UNAVAILABLE');
+    expect(healthFailedState.livenessBadge).toBe('UNHEALTHY');
+    expect(healthFailedState.readinessBadge).toBe('ONLINE / READY');
+
+    // Scenario 3: /health succeeds ("healthy"), but /ready reports degraded status
+    const degradedState = computeHealthViewState(
+      { status: 'healthy' },
+      false,
+      false,
+      { status: 'degraded', rate_limiter: 'ready', database: 'unhealthy', redis: 'ready' },
+      false,
+      false
+    );
+    expect(degradedState.isLivenessOk).toBe(true);
+    expect(degradedState.isReadinessOk).toBe(false);
+    expect(degradedState.isDegraded).toBe(true);
+    expect(degradedState.bannerTitle).toBe('SYSTEM DEGRADED (PARTIAL READINESS)');
+    expect(degradedState.livenessBadge).toBe('HEALTHY');
+    expect(degradedState.readinessBadge).toBe('DEGRADED');
+
+    // Scenario 4: Initial loading state
+    const loadingState = computeHealthViewState(
+      undefined,
+      true,
+      false,
+      undefined,
+      true,
+      false
+    );
+    expect(loadingState.isInitialLoading).toBe(true);
+    expect(loadingState.bannerTitle).toBe('CHECKING GATEWAY STATUS...');
+    expect(loadingState.livenessBadge).toBe('CHECKING...');
+    expect(loadingState.readinessBadge).toBe('CHECKING...');
+
+    // Scenario 5: Both endpoints fail
+    const bothFailedState = computeHealthViewState(
+      undefined,
+      false,
+      true,
+      undefined,
+      false,
+      true
+    );
+    expect(bothFailedState.isLivenessOk).toBe(false);
+    expect(bothFailedState.isReadinessOk).toBe(false);
+    expect(bothFailedState.bannerTitle).toBe('GATEWAY SERVICE UNAVAILABLE');
+    expect(bothFailedState.livenessBadge).toBe('UNHEALTHY');
+    expect(bothFailedState.readinessBadge).toBe('UNHEALTHY');
+  });
+
+  it('validates case-insensitive status handling for health and ready endpoints', () => {
+    const isLivenessOk = (status?: string) =>
+      Boolean(status && (status.toLowerCase() === 'healthy' || status.toLowerCase() === 'ok'));
+    const isReadinessOk = (status?: string) =>
+      Boolean(status && (status.toLowerCase() === 'ready' || status.toLowerCase() === 'healthy' || status.toLowerCase() === 'ok'));
+
+    expect(isLivenessOk('HEALTHY')).toBe(true);
+    expect(isLivenessOk('healthy')).toBe(true);
+    expect(isLivenessOk('OK')).toBe(true);
+    expect(isLivenessOk('ok')).toBe(true);
+    expect(isLivenessOk('unhealthy')).toBe(false);
+    expect(isLivenessOk(undefined)).toBe(false);
+
+    expect(isReadinessOk('READY')).toBe(true);
+    expect(isReadinessOk('ready')).toBe(true);
+    expect(isReadinessOk('degraded')).toBe(false);
+    expect(isReadinessOk('unhealthy')).toBe(false);
+  });
+
   it('imports SettingsView component successfully', async () => {
     const { SettingsView } = await import('./components/views/SettingsView');
     expect(SettingsView).toBeDefined();

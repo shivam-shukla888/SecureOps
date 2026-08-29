@@ -56,9 +56,11 @@ async function request<T>(path: string, options: RequestInit = {}, apiKey?: stri
     headers['Authorization'] = `Bearer ${cleanToken}`;
   }
 
+  const baseUrl = getApiBaseUrl();
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetch(`${baseUrl}${normalizedPath}`, {
       ...options,
       headers,
     });

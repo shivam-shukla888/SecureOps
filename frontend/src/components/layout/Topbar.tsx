@@ -69,14 +69,16 @@ export const Topbar: React.FC = () => {
       try {
         // Prefer /ready check since it verifies db, redis, and rate limiter
         const readyRes = await api.getReady();
-        if (readyRes && (readyRes.status === 'ready' || readyRes.status === 'healthy')) {
+        const rStatus = readyRes?.status?.toLowerCase();
+        if (rStatus === 'ready' || rStatus === 'healthy' || rStatus === 'ok') {
           isOnline = true;
         }
       } catch {
         // Fallback to /health check
         try {
           const healthRes = await api.getHealth();
-          if (healthRes && (healthRes.status === 'healthy' || healthRes.status === 'ready')) {
+          const hStatus = healthRes?.status?.toLowerCase();
+          if (hStatus === 'healthy' || hStatus === 'ready' || hStatus === 'ok') {
             isOnline = true;
           }
         } catch {
