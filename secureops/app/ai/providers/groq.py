@@ -11,30 +11,23 @@ logger = logging.getLogger(__name__)
 
 # Valid production Groq models in priority fallback order
 GROQ_CANDIDATE_MODELS = [
+    "openai/gpt-oss-20b",
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "openai/gpt-oss-20b",
-    "llama3-70b-8192",
-    "llama3-8b-8192",
-    "mixtral-8x7b-32768",
 ]
-
-_DISCOVERED_GROQ_MODELS: List[str] = []
 
 
 def _normalize_groq_model(raw_model: Optional[str]) -> str:
     if not raw_model:
-        return "llama-3.3-70b-versatile"
+        return "openai/gpt-oss-20b"
     cleaned = raw_model.strip("\"' \t\r\n")
     if cleaned in GROQ_CANDIDATE_MODELS:
         return cleaned
     if "8b" in cleaned.lower():
         return "llama-3.1-8b-instant"
-    if "gpt-oss" in cleaned.lower() or "openai" in cleaned.lower():
-        return "openai/gpt-oss-20b"
-    if "mixtral" in cleaned.lower():
-        return "mixtral-8x7b-32768"
-    return "llama-3.3-70b-versatile"
+    if "70b" in cleaned.lower():
+        return "llama-3.3-70b-versatile"
+    return "openai/gpt-oss-20b"
 
 
 class GroqProvider(BaseAIProvider):
@@ -42,7 +35,7 @@ class GroqProvider(BaseAIProvider):
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 15.0,
+        timeout: float = 4.0,
     ):
         self._explicit_api_key = api_key
         self._explicit_model = model
@@ -70,34 +63,11 @@ class GroqProvider(BaseAIProvider):
     def is_configured(self) -> bool:
         return bool(self.api_key and self.api_key not in DANGEROUS_DUMMY_KEYS)
 
-    async def _discover_models(self) -> List[str]:
-        global _DISCOVERED_GROQ_MODELS
-        if _DISCOVERED_GROQ_MODELS:
-            return _DISCOVERED_GROQ_MODELS
-
-        try:
-            url = "https://api.groq.com/openai/v1/models"
-            headers = {"Authorization": f"Bearer {self.api_key}"}
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                res = await client.get(url, headers=headers)
-                if res.status_code == 200:
-                    models_data = res.json().get("data", [])
-                    discovered = [
-                        m["id"] for m in models_data
-                        if any(k in m.get("id", "").lower() for k in ["llama", "gpt-oss", "qwen", "mixtral", "gemma"])
-                    ]
-                    if discovered:
-                        _DISCOVERED_GROQ_MODELS = discovered
-                        return discovered
-        except Exception as exc:
-            logger.debug(f"Groq model discovery skipped: {exc}")
-        return []
-
     async def classify_request(self, user_request: str) -> ClassifierResult:
         if not self.is_configured:
             raise ValueError("GROQ_API_KEY is not configured.")
 
-        # Build candidate list with configured model first
+        # Build candidate list with primary model first
         models_to_try: List[str] = [self.model]
         for m in GROQ_CANDIDATE_MODELS:
             if m not in models_to_try:
@@ -135,19 +105,9 @@ class GroqProvider(BaseAIProvider):
                 last_error = http_err
                 logger.info(f"Groq HTTP REST call on {candidate_model} returned: {http_err}")
 
-        # 3. Dynamic model discovery on 404
-        if "404" in str(last_error) or "NOT_FOUND" in str(last_error):
-            discovered = await self._discover_models()
-            for disc_model in discovered:
-                if disc_model not in models_to_try:
-                    try:
-                        return await self._classify_via_http(user_request, disc_model)
-                    except Exception as disc_err:
-                        last_error = disc_err
-
         if last_error:
             raise last_error
-        raise RuntimeError("Groq classification failed across all candidate models.")
+        raise RuntimeError("Groq classification failed.")
 
     async def _classify_via_http(self, user_request: str, model_name: str) -> ClassifierResult:
         url = "https://api.groq.com/openai/v1/chat/completions"
