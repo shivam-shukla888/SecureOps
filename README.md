@@ -1,10 +1,12 @@
 # SecureOps — Universal AI Agent Security Gateway & Adversarial Benchmark Engine
 
-[![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-emerald.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18-cyan.svg)](https://react.dev/)
-[![Security Audit](https://img.shields.io/badge/Security--Audit-100%25%20PASS-brightgreen.svg)]()
-[![Automated Tests](https://img.shields.io/badge/Tests-147%20Passed-brightgreen.svg)]()
+[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Dashboard-black.svg?logo=vercel)](https://secure-ops-pi.vercel.app)
+[![Render Gateway](https://img.shields.io/badge/Render-API%20Gateway-46E3B7.svg?logo=render)](https://secureops-gateway.onrender.com)
+[![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-emerald.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-18-cyan.svg?logo=react)](https://react.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-39%20Passed-brightgreen.svg?logo=vitest)]()
+[![Pytest](https://img.shields.io/badge/Pytest-147%20Passed-brightgreen.svg?logo=pytest)]()
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
 **SecureOps** is an enterprise-grade, provider-agnostic **AI Agent Security Gateway, Tool Execution Firewall & Adversarial Benchmark Engine**.
@@ -15,7 +17,33 @@ Additionally, SecureOps provides the **Adversarial Benchmark Engine (`security-b
 
 ---
 
-## Key Capabilities
+## 🌐 Live Production Deployments
+
+| Component | Service Provider | Live Production URL |
+| :--- | :--- | :--- |
+| **Frontend Security Console** | **Vercel** | [https://secure-ops-pi.vercel.app](https://secure-ops-pi.vercel.app) |
+| **API Security Gateway** | **Render** | [https://secureops-gateway.onrender.com](https://secureops-gateway.onrender.com) |
+| **Interactive Swagger Docs** | **FastAPI / Render** | [https://secureops-gateway.onrender.com/docs](https://secureops-gateway.onrender.com/docs) |
+| **Public Liveness Probe** | **Render Gateway** | [https://secureops-gateway.onrender.com/health](https://secureops-gateway.onrender.com/health) |
+| **Subsystem Readiness Probe** | **Render Gateway** | [https://secureops-gateway.onrender.com/ready](https://secureops-gateway.onrender.com/ready) |
+
+### Governed Dashboard Deep Links
+- 📊 **Overview**: [https://secure-ops-pi.vercel.app/dashboard](https://secure-ops-pi.vercel.app/dashboard)
+- 🛡️ **Request Gateway**: [https://secure-ops-pi.vercel.app/gateway](https://secure-ops-pi.vercel.app/gateway)
+- ✋ **Approval Center**: [https://secure-ops-pi.vercel.app/approvals](https://secure-ops-pi.vercel.app/approvals)
+- 🚨 **Security Events**: [https://secure-ops-pi.vercel.app/security-events](https://secure-ops-pi.vercel.app/security-events)
+- 📜 **Audit Explorer**: [https://secure-ops-pi.vercel.app/audit](https://secure-ops-pi.vercel.app/audit)
+- ⚡ **Execution Center**: [https://secure-ops-pi.vercel.app/executions](https://secure-ops-pi.vercel.app/executions)
+- 🔧 **Tool Governance**: [https://secure-ops-pi.vercel.app/tools](https://secure-ops-pi.vercel.app/tools)
+- 🏢 **Multi-Tenancy**: [https://secure-ops-pi.vercel.app/tenants](https://secure-ops-pi.vercel.app/tenants)
+- 👥 **Users & Roles**: [https://secure-ops-pi.vercel.app/rbac](https://secure-ops-pi.vercel.app/rbac)
+- 🔑 **API Credentials**: [https://secure-ops-pi.vercel.app/credentials](https://secure-ops-pi.vercel.app/credentials)
+- 🩺 **System Health**: [https://secure-ops-pi.vercel.app/health](https://secure-ops-pi.vercel.app/health)
+- ⚙️ **Settings**: [https://secure-ops-pi.vercel.app/settings](https://secure-ops-pi.vercel.app/settings)
+
+---
+
+## 🛡️ Key Capabilities
 
 - 🛡️ **Deterministic Policy Engine**: Enforces canonical anti-downgrade matrices. Destructive actions (e.g. `delete_data`, `wipe_database`) unconditionally require human approval regardless of LLM output or client prompt manipulation.
 - 🤖 **Universal Agent Compatibility**:
@@ -38,7 +66,7 @@ Additionally, SecureOps provides the **Adversarial Benchmark Engine (`security-b
 
 ---
 
-## High-Level System Architecture
+## 🏛️ High-Level System Architecture
 
 ```text
                                 SecureOps Gateway Architecture
@@ -87,7 +115,7 @@ Additionally, SecureOps provides the **Adversarial Benchmark Engine (`security-b
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```text
 SecureOps/
@@ -115,12 +143,13 @@ SecureOps/
 │   ├── test_documents/        # Isolated Tenant Document Repositories
 │   └── tests/                 # 147+ Automated Pytest Security & Regression Tests
 │
-├── frontend/                  # React + Vite + TypeScript Dashboard
+├── frontend/                  # React + Vite + TypeScript Dashboard (Vercel)
 │   ├── src/
 │   │   ├── components/        # Layout & Glassmorphism Dashboard Views
 │   │   ├── context/           # Tab-Scoped AuthContext (sessionStorage)
 │   │   ├── services/          # API Client & Header Sanitization
 │   │   └── types/             # TypeScript API Interfaces
+│   ├── vercel.json            # Vercel SPA Client-Side Routing Fallback
 │   └── package.json
 │
 ├── docker-compose.yml         # Containerized Infrastructure (PostgreSQL, Redis)
@@ -131,7 +160,7 @@ SecureOps/
 
 ---
 
-## Quickstart Guide
+## ⚡ Quickstart Guide
 
 ### Prerequisites
 - **Python**: 3.11 or higher
@@ -143,12 +172,12 @@ SecureOps/
 
 ### Backend Setup (FastAPI Gateway)
 
-1. **Navigate to the backend directory**:
+1. **Navigate to backend directory**:
    ```bash
    cd secureops
    ```
 
-2. **Create and activate a virtual environment**:
+2. **Create and activate virtual environment**:
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -171,7 +200,7 @@ SecureOps/
    REDIS_URL=redis://localhost:6379/0
    GEMINI_API_KEY=your_gemini_key
    GROQ_API_KEY=your_groq_key
-   CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173
+   CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://secure-ops-pi.vercel.app
    ```
 
 5. **Apply database migrations**:
@@ -179,20 +208,20 @@ SecureOps/
    alembic upgrade head
    ```
 
-6. **Run the security verification & test suite**:
+6. **Run security verification & test suite**:
    ```bash
    python -m pytest -v
    python scripts/secret_scan.py
    ```
 
-7. **Start the API server**:
+7. **Start API server**:
    ```bash
    python -m uvicorn app.main:app --reload --port 8000
    ```
    - **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
    - **Health Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
-8. **Run the Universal Agent Benchmark Demo**:
+8. **Run Universal Agent Benchmark Demo**:
    ```bash
    python scripts/demo_universal_agent.py
    ```
@@ -201,7 +230,7 @@ SecureOps/
 
 ### Frontend Setup (React / Vite)
 
-1. **Navigate to the frontend directory**:
+1. **Navigate to frontend directory**:
    ```bash
    cd frontend
    ```
@@ -211,19 +240,25 @@ SecureOps/
    npm install
    ```
 
-3. **Start the development server**:
+3. **Start development server**:
    ```bash
    npm run dev
    ```
    - **Frontend Dashboard**: [http://localhost:5173](http://localhost:5173) (or `http://localhost:3000`)
 
+4. **Run unit tests & production build**:
+   ```bash
+   npm run test
+   npm run build
+   ```
+
 ---
 
-## Key API Endpoints
+## 📡 Key API Endpoints
 
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :---: |
-| `GET` | `/health` | Server liveness check | No |
+| `GET` | `/health` | Public server liveness check | No |
 | `GET` | `/ready` | Gateway & subsystem readiness check | No |
 | `POST` | `/v1/requests` | Primary AI Gateway classification & execution | Yes (Bearer) |
 | `POST` | `/v1/executions` | Execution Center direct tool execution | Yes (Bearer) |
@@ -241,7 +276,7 @@ SecureOps/
 
 ---
 
-## Adversarial Benchmark Suite (`security-baseline-v1`)
+## 🎯 Adversarial Benchmark Suite (`security-baseline-v1`)
 
 | Domain | Tests Evaluated | Enforcement Outcome |
 | :--- | :--- | :--- |
@@ -254,15 +289,17 @@ SecureOps/
 
 ---
 
-## Security Verification & Quality Assurance
+## ✅ Quality Assurance & Verification Metrics
 
-- **Automated Test Suite**: **147 / 147 PASS (100%)**
+- **Vitest Frontend Tests**: **39 / 39 PASS (100%)**
+- **Pytest Backend Tests**: **147 / 147 PASS (100%)**
 - **Hardcoded Secret Scanner**: **0 Secrets Detected**
+- **Vercel SPA Client-Side Routing**: **Verified across all 12 deep links**
 - **Live HTTP Real-World Socket Verification**: **Verified**
 - **Open Vulnerabilities**: **0 Critical / 0 High**
 
 ---
 
-## License
+## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
