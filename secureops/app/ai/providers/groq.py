@@ -9,6 +9,16 @@ from app.ai.prompts import SYSTEM_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
+# Valid Groq production models
+VALID_GROQ_MODELS = {
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "llama3-70b-8192",
+    "llama3-8b-8192",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it",
+}
+
 
 class GroqProvider(BaseAIProvider):
     def __init__(
@@ -18,12 +28,21 @@ class GroqProvider(BaseAIProvider):
         timeout: float = 10.0,
     ):
         self.api_key = api_key if api_key is not None else settings.GROQ_API_KEY
-        self.model = model if model is not None else settings.GROQ_MODEL
+        raw_model = model if model is not None else settings.GROQ_MODEL
+        # Normalize non-existent/outdated model names (e.g. openai/gpt-oss-20b)
+        if raw_model and (raw_model not in VALID_GROQ_MODELS and ("gpt-oss" in raw_model or "openai/" in raw_model)):
+            self.model = "llama-3.3-70b-versatile"
+        else:
+            self.model = raw_model or "llama-3.3-70b-versatile"
         self.timeout = timeout
 
     @property
     def name(self) -> str:
         return "groq"
+
+    @property
+    def model_name(self) -> str:
+        return self.model
 
     @property
     def is_configured(self) -> bool:
@@ -53,7 +72,7 @@ class GroqProvider(BaseAIProvider):
         except ImportError:
             logger.info("groq SDK not found; using direct HTTP REST API for Groq.")
         except Exception as err:
-            logger.warning(f"Groq SDK classification call failed: {type(err).__name__}; falling back to HTTP REST API.")
+            logger.warning(f"Groq SDK classification call returned: {type(err).__name__}; falling back to HTTP REST API.")
 
         return await self._classify_via_http(user_request)
 

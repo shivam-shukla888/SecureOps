@@ -23,13 +23,17 @@ class PrimaryOpenAIProvider(BaseAIProvider):
         timeout: float = 10.0,
     ):
         self.api_key = api_key if api_key is not None else settings.PRIMARY_API_KEY
-        self.model = model if model is not None else settings.PRIMARY_MODEL
-        self.base_url = base_url if base_url is not None else settings.PRIMARY_BASE_URL
+        self.model = model if model is not None else (settings.PRIMARY_MODEL or "gpt-4o-mini")
+        self.base_url = base_url if base_url is not None else (settings.PRIMARY_BASE_URL or "https://api.openai.com/v1")
         self.timeout = timeout
 
     @property
     def name(self) -> str:
         return "openai"
+
+    @property
+    def model_name(self) -> str:
+        return self.model
 
     @property
     def is_configured(self) -> bool:
