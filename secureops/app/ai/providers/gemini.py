@@ -3,29 +3,36 @@ import logging
 from typing import Optional
 import httpx
 
-from app.config import settings
+from app.config import settings, DANGEROUS_DUMMY_KEYS
 from app.schemas.decision import ClassifierResult, IntentEnum, RiskEnum
 from app.ai.providers.base import BaseAIProvider, parse_and_validate_classifier_json
 from app.ai.prompts import SYSTEM_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
-# Standard Gemini safety settings to ensure security-evaluation prompts are not blocked
-GEMINI_SAFETY_SETTINGS = [
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-]
-
-# Supported Gemini model aliases for graceful fallback if invalid model is supplied in environment
+# Valid production Gemini models
 VALID_GEMINI_MODELS = {
     "gemini-1.5-flash",
     "gemini-1.5-pro",
     "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
     "gemini-2.5-flash",
-    "gemini-1.0-pro",
 }
+
+
+def _normalize_gemini_model(raw_model: Optional[str]) -> str:
+    if not raw_model:
+        return "gemini-1.5-flash"
+    cleaned = raw_model.strip("\"' \t\r\n")
+    if cleaned.startswith("models/"):
+        cleaned = cleaned[7:]
+    if cleaned in VALID_GEMINI_MODELS:
+        return cleaned
+    if "2.0" in cleaned or "2-flash" in cleaned:
+        return "gemini-2.0-flash"
+    if "pro" in cleaned.lower():
+        return "gemini-1.5-pro"
+    return "gemini-1.5-flash"
 
 
 class GeminiProvider(BaseAIProvider):
@@ -35,14 +42,19 @@ class GeminiProvider(BaseAIProvider):
         model: Optional[str] = None,
         timeout: float = 10.0,
     ):
-        self.api_key = api_key if api_key is not None else settings.GEMINI_API_KEY
-        raw_model = model if model is not None else settings.GEMINI_MODEL
-        # Normalize non-existent/outdated model names (e.g. gemini-3.5-flash)
-        if raw_model and raw_model not in VALID_GEMINI_MODELS and "3.5" in raw_model:
-            self.model = "gemini-1.5-flash"
-        else:
-            self.model = raw_model or "gemini-1.5-flash"
+        self._explicit_api_key = api_key
+        self._explicit_model = model
         self.timeout = timeout
+
+    @property
+    def api_key(self) -> str:
+        raw = self._explicit_api_key if self._explicit_api_key is not None else settings.GEMINI_API_KEY
+        return raw.strip("\"' \t\r\n") if raw else ""
+
+    @property
+    def model(self) -> str:
+        raw = self._explicit_model if self._explicit_model is not None else settings.GEMINI_MODEL
+        return _normalize_gemini_model(raw)
 
     @property
     def name(self) -> str:
@@ -54,27 +66,26 @@ class GeminiProvider(BaseAIProvider):
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.api_key and self.api_key.strip())
+        return bool(self.api_key and self.api_key not in DANGEROUS_DUMMY_KEYS)
 
     async def classify_request(self, user_request: str) -> ClassifierResult:
         if not self.is_configured:
             raise ValueError("GEMINI_API_KEY is not configured.")
 
-        # Attempt direct HTTP REST classification first (non-blocking async with safety settings)
+        # 1. Attempt direct async HTTP REST API call
         try:
             return await self._classify_via_http(user_request)
         except Exception as http_err:
-            logger.info(f"Gemini direct HTTP classification returned: {type(http_err).__name__}; checking SDK fallback...")
+            logger.info(f"Gemini HTTP REST call failed: {type(http_err).__name__}; attempting SDK fallback...")
 
-        # Fallback to google-genai SDK if available
+        # 2. Fallback to google-genai SDK if installed
         try:
             from google import genai
             from google.genai import types
 
             client = genai.Client(api_key=self.api_key)
             prompt = f"User Request: {user_request}"
-            
-            # Execute SDK generate_content in thread pool to prevent event loop blocking
+
             response = await asyncio.to_thread(
                 client.models.generate_content,
                 model=self.model,
@@ -85,20 +96,24 @@ class GeminiProvider(BaseAIProvider):
                     temperature=0.0,
                 ),
             )
-            
+
             if response and response.text:
                 return parse_and_validate_classifier_json(response.text, provider_name="Gemini")
         except ImportError:
             pass
         except Exception as sdk_err:
-            logger.warning(f"Gemini SDK fallback also failed: {type(sdk_err).__name__}")
+            logger.warning(f"Gemini SDK fallback failed: {type(sdk_err).__name__}")
             raise sdk_err
 
         raise RuntimeError("Gemini classification failed via both HTTP REST and SDK.")
 
     async def _classify_via_http(self, user_request: str) -> ClassifierResult:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
-        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        headers = {
+            "x-goog-api-key": self.api_key,
+            "Content-Type": "application/json",
+        }
+
         payload = {
             "contents": [
                 {
@@ -112,7 +127,6 @@ class GeminiProvider(BaseAIProvider):
                     {"text": SYSTEM_CLASSIFICATION_PROMPT}
                 ]
             },
-            "safetySettings": GEMINI_SAFETY_SETTINGS,
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "temperature": 0.0
@@ -121,14 +135,32 @@ class GeminiProvider(BaseAIProvider):
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(url, json=payload)
+                response = await client.post(url, json=payload, headers=headers)
+                
+                # If systemInstruction format fails on certain v1beta endpoints, retry with combined prompt
+                if response.status_code != 200:
+                    combined_payload = {
+                        "contents": [
+                            {
+                                "parts": [
+                                    {"text": f"{SYSTEM_CLASSIFICATION_PROMPT}\n\nUser Request:\n{user_request}"}
+                                ]
+                            }
+                        ],
+                        "generationConfig": {
+                            "responseMimeType": "application/json",
+                            "temperature": 0.0
+                        }
+                    }
+                    response = await client.post(url, json=combined_payload, headers=headers)
+
                 if response.status_code != 200:
                     raise RuntimeError(
                         f"Gemini API returned HTTP status {response.status_code}"
                     )
 
                 res_json = response.json()
-                
+
                 # Check for prompt feedback blocks (e.g. SAFETY)
                 prompt_feedback = res_json.get("promptFeedback", {})
                 if prompt_feedback.get("blockReason") == "SAFETY":

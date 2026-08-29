@@ -282,9 +282,9 @@ def test_8_no_provider_credentials_fails_closed_and_safe_diagnostics():
         assert res.status_code == 200
         data = res.json()
         assert data["ai_classifier"] == "unavailable"
-        assert data["ai_provider_status"]["primary"] == "unconfigured"
-        assert data["ai_provider_status"]["gemini"] == "unconfigured"
-        assert data["ai_provider_status"]["groq"] == "unconfigured"
+        assert data["ai_provider_status"]["primary"]["configured"] is False
+        assert data["ai_provider_status"]["gemini"]["configured"] is False
+        assert data["ai_provider_status"]["groq"]["configured"] is False
 
 
 # ==============================================================================

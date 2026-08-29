@@ -217,25 +217,21 @@ async def readiness_check():
     else:
         redis_status = "unconfigured"
 
-    from app.config import DANGEROUS_DUMMY_KEYS
-    has_primary = bool(settings.PRIMARY_API_KEY and settings.PRIMARY_API_KEY not in DANGEROUS_DUMMY_KEYS)
-    has_gemini = bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY not in DANGEROUS_DUMMY_KEYS)
-    has_groq = bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY not in DANGEROUS_DUMMY_KEYS)
-    ai_available = has_primary or has_gemini or has_groq
-
-    ai_provider_status = {
-        "primary": "configured" if has_primary else "unconfigured",
-        "gemini": "configured" if has_gemini else "unconfigured",
-        "groq": "configured" if has_groq else "unconfigured",
-    }
+    from app.ai.health import get_all_ai_providers_health
+    from app.ai.classifier import intent_classifier
+    ai_health = await get_all_ai_providers_health(
+        intent_classifier.openai_provider,
+        intent_classifier.gemini_provider,
+        intent_classifier.groq_provider,
+    )
 
     return {
         "status": "ready" if overall_ready else "degraded",
         "rate_limiter": "ready" if limiter_ok else "unhealthy",
         "database": "ready" if db_ok else "unhealthy",
         "redis": redis_status,
-        "ai_classifier": "ready" if ai_available else "unavailable",
-        "ai_provider_status": ai_provider_status,
+        "ai_classifier": ai_health["status"],
+        "ai_provider_status": ai_health["providers"],
         "metrics_summary": metrics_summary,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

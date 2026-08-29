@@ -2,14 +2,14 @@ import logging
 from typing import Optional
 import httpx
 
-from app.config import settings
+from app.config import settings, DANGEROUS_DUMMY_KEYS
 from app.schemas.decision import ClassifierResult
 from app.ai.providers.base import BaseAIProvider, parse_and_validate_classifier_json
 from app.ai.prompts import SYSTEM_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
-# Valid Groq production models
+# Valid production Groq models (active on Groq Cloud)
 VALID_GROQ_MODELS = {
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
@@ -20,6 +20,19 @@ VALID_GROQ_MODELS = {
 }
 
 
+def _normalize_groq_model(raw_model: Optional[str]) -> str:
+    if not raw_model:
+        return "llama-3.3-70b-versatile"
+    cleaned = raw_model.strip("\"' \t\r\n")
+    if cleaned in VALID_GROQ_MODELS:
+        return cleaned
+    if "8b" in cleaned.lower():
+        return "llama-3.1-8b-instant"
+    if "mixtral" in cleaned.lower():
+        return "mixtral-8x7b-32768"
+    return "llama-3.3-70b-versatile"
+
+
 class GroqProvider(BaseAIProvider):
     def __init__(
         self,
@@ -27,14 +40,19 @@ class GroqProvider(BaseAIProvider):
         model: Optional[str] = None,
         timeout: float = 10.0,
     ):
-        self.api_key = api_key if api_key is not None else settings.GROQ_API_KEY
-        raw_model = model if model is not None else settings.GROQ_MODEL
-        # Normalize non-existent/outdated model names (e.g. openai/gpt-oss-20b)
-        if raw_model and (raw_model not in VALID_GROQ_MODELS and ("gpt-oss" in raw_model or "openai/" in raw_model)):
-            self.model = "llama-3.3-70b-versatile"
-        else:
-            self.model = raw_model or "llama-3.3-70b-versatile"
+        self._explicit_api_key = api_key
+        self._explicit_model = model
         self.timeout = timeout
+
+    @property
+    def api_key(self) -> str:
+        raw = self._explicit_api_key if self._explicit_api_key is not None else settings.GROQ_API_KEY
+        return raw.strip("\"' \t\r\n") if raw else ""
+
+    @property
+    def model(self) -> str:
+        raw = self._explicit_model if self._explicit_model is not None else settings.GROQ_MODEL
+        return _normalize_groq_model(raw)
 
     @property
     def name(self) -> str:
@@ -46,13 +64,13 @@ class GroqProvider(BaseAIProvider):
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.api_key and self.api_key.strip())
+        return bool(self.api_key and self.api_key not in DANGEROUS_DUMMY_KEYS)
 
     async def classify_request(self, user_request: str) -> ClassifierResult:
         if not self.is_configured:
             raise ValueError("GROQ_API_KEY is not configured.")
 
-        # Try using groq SDK if installed
+        # 1. Try using groq SDK if installed
         try:
             from groq import AsyncGroq
 
@@ -72,8 +90,9 @@ class GroqProvider(BaseAIProvider):
         except ImportError:
             logger.info("groq SDK not found; using direct HTTP REST API for Groq.")
         except Exception as err:
-            logger.warning(f"Groq SDK classification call returned: {type(err).__name__}; falling back to HTTP REST API.")
+            logger.warning(f"Groq SDK classification call failed: {type(err).__name__}; falling back to HTTP REST API.")
 
+        # 2. Fallback to direct HTTP REST API
         return await self._classify_via_http(user_request)
 
     async def _classify_via_http(self, user_request: str) -> ClassifierResult:
@@ -95,6 +114,12 @@ class GroqProvider(BaseAIProvider):
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, json=payload, headers=headers)
+                
+                # If json_object mode fails on older models, retry without response_format
+                if response.status_code != 200:
+                    payload.pop("response_format", None)
+                    response = await client.post(url, json=payload, headers=headers)
+
                 if response.status_code != 200:
                     raise RuntimeError(
                         f"Groq API returned HTTP status {response.status_code}"

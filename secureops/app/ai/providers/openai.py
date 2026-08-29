@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 import httpx
 
-from app.config import settings
+from app.config import settings, DANGEROUS_DUMMY_KEYS
 from app.schemas.decision import ClassifierResult
 from app.ai.providers.base import BaseAIProvider, parse_and_validate_classifier_json
 from app.ai.prompts import SYSTEM_CLASSIFICATION_PROMPT
@@ -22,10 +22,25 @@ class PrimaryOpenAIProvider(BaseAIProvider):
         base_url: Optional[str] = None,
         timeout: float = 10.0,
     ):
-        self.api_key = api_key if api_key is not None else settings.PRIMARY_API_KEY
-        self.model = model if model is not None else (settings.PRIMARY_MODEL or "gpt-4o-mini")
-        self.base_url = base_url if base_url is not None else (settings.PRIMARY_BASE_URL or "https://api.openai.com/v1")
+        self._explicit_api_key = api_key
+        self._explicit_model = model
+        self._explicit_base_url = base_url
         self.timeout = timeout
+
+    @property
+    def api_key(self) -> str:
+        raw = self._explicit_api_key if self._explicit_api_key is not None else settings.PRIMARY_API_KEY
+        return raw.strip("\"' \t\r\n") if raw else ""
+
+    @property
+    def model(self) -> str:
+        raw = self._explicit_model if self._explicit_model is not None else settings.PRIMARY_MODEL
+        return raw.strip("\"' \t\r\n") if raw else "gpt-4o-mini"
+
+    @property
+    def base_url(self) -> str:
+        raw = self._explicit_base_url if self._explicit_base_url is not None else settings.PRIMARY_BASE_URL
+        return raw.strip("\"' \t\r\n") if raw else "https://api.openai.com/v1"
 
     @property
     def name(self) -> str:
@@ -37,7 +52,7 @@ class PrimaryOpenAIProvider(BaseAIProvider):
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.api_key and self.api_key.strip())
+        return bool(self.api_key and self.api_key not in DANGEROUS_DUMMY_KEYS)
 
     async def classify_request(self, user_request: str) -> ClassifierResult:
         if not self.is_configured:
@@ -61,6 +76,12 @@ class PrimaryOpenAIProvider(BaseAIProvider):
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, json=payload, headers=headers)
+                
+                # If json_object response format is rejected, retry without it
+                if response.status_code != 200:
+                    payload.pop("response_format", None)
+                    response = await client.post(url, json=payload, headers=headers)
+
                 if response.status_code != 200:
                     raise RuntimeError(
                         f"Primary OpenAI API returned HTTP status {response.status_code}"
