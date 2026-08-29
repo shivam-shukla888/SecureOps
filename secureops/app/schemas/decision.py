@@ -58,7 +58,7 @@ class SecurityGatewayResponse(BaseModel):
     requires_approval: bool
     decision: DecisionEnum
     override_applied: bool
-    provider_used: str = "gemini"
+    provider_used: str = "openai"
     fallback_used: bool = False
     approval_id: Optional[str] = None
     expires_at: Optional[str] = None

@@ -66,6 +66,7 @@ async def lifespan(app_instance: FastAPI):
     print(f"  REDIS                  : {'CONFIGURED' if (settings.is_upstash_configured or settings.has_remote_redis or settings.REDIS_URL) else 'MISSING'}")
     print(f"  UPSTASH_REDIS          : {'CONFIGURED' if settings.is_upstash_configured else 'MISSING'}")
     print(f"  RATE_LIMIT_BACKEND     : {settings.RATE_LIMIT_BACKEND}")
+    print(f"  PRIMARY_API_KEY        : {'CONFIGURED' if settings.PRIMARY_API_KEY else 'MISSING'}")
     print(f"  GEMINI_API_KEY         : {'CONFIGURED' if settings.GEMINI_API_KEY else 'MISSING'}")
     print(f"  GROQ_API_KEY           : {'CONFIGURED' if settings.GROQ_API_KEY else 'MISSING'}")
     print(f"  N8N_APPROVAL_WEBHOOK   : {'CONFIGURED' if settings.N8N_APPROVAL_WEBHOOK_URL else 'MISSING'}")
@@ -216,11 +217,25 @@ async def readiness_check():
     else:
         redis_status = "unconfigured"
 
+    from app.config import DANGEROUS_DUMMY_KEYS
+    has_primary = bool(settings.PRIMARY_API_KEY and settings.PRIMARY_API_KEY not in DANGEROUS_DUMMY_KEYS)
+    has_gemini = bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY not in DANGEROUS_DUMMY_KEYS)
+    has_groq = bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY not in DANGEROUS_DUMMY_KEYS)
+    ai_available = has_primary or has_gemini or has_groq
+
+    ai_provider_status = {
+        "primary": "configured" if has_primary else "unconfigured",
+        "gemini": "configured" if has_gemini else "unconfigured",
+        "groq": "configured" if has_groq else "unconfigured",
+    }
+
     return {
         "status": "ready" if overall_ready else "degraded",
         "rate_limiter": "ready" if limiter_ok else "unhealthy",
         "database": "ready" if db_ok else "unhealthy",
         "redis": redis_status,
+        "ai_classifier": "ready" if ai_available else "unavailable",
+        "ai_provider_status": ai_provider_status,
         "metrics_summary": metrics_summary,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

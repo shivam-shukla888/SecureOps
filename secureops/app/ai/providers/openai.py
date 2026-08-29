@@ -1,11 +1,10 @@
-import json
 import logging
 from typing import Optional
 import httpx
 
 from app.config import settings
-from app.schemas.decision import ClassifierResult, IntentEnum, RiskEnum
-from app.ai.providers.base import BaseAIProvider
+from app.schemas.decision import ClassifierResult
+from app.ai.providers.base import BaseAIProvider, parse_and_validate_classifier_json
 from app.ai.prompts import SYSTEM_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -16,16 +15,30 @@ class PrimaryOpenAIProvider(BaseAIProvider):
     Main Primary AI Provider configured with PRIMARY_API_KEY.
     Connects to OpenAI / OpenAI-compatible endpoint.
     """
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, base_url: Optional[str] = None):
-        self.api_key = api_key or settings.PRIMARY_API_KEY
-        self.model = model or settings.PRIMARY_MODEL
-        self.base_url = base_url or settings.PRIMARY_BASE_URL
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: float = 10.0,
+    ):
+        self.api_key = api_key if api_key is not None else settings.PRIMARY_API_KEY
+        self.model = model if model is not None else settings.PRIMARY_MODEL
+        self.base_url = base_url if base_url is not None else settings.PRIMARY_BASE_URL
+        self.timeout = timeout
+
+    @property
+    def name(self) -> str:
+        return "openai"
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key and self.api_key.strip())
 
     async def classify_request(self, user_request: str) -> ClassifierResult:
-        if not self.api_key:
+        if not self.is_configured:
             raise ValueError("PRIMARY_API_KEY is not configured.")
 
-        # Direct HTTP REST call to OpenAI-compatible endpoint
         url = f"{self.base_url.rstrip('/')}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -41,50 +54,25 @@ class PrimaryOpenAIProvider(BaseAIProvider):
             "temperature": 0.0,
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            if response.status_code != 200:
-                raise RuntimeError(
-                    f"Primary OpenAI API returned HTTP {response.status_code}: {response.text}"
-                )
-
-            res_json = response.json()
-            content = res_json["choices"][0]["message"]["content"]
-            return self._parse_json_to_result(content)
-
-    def _parse_json_to_result(self, json_str: str) -> ClassifierResult:
-        text_content = json_str.strip()
-        if text_content.startswith("```json"):
-            text_content = text_content[7:]
-        if text_content.startswith("```"):
-            text_content = text_content[3:]
-        if text_content.endswith("```"):
-            text_content = text_content[:-3]
-        text_content = text_content.strip()
-
-        parsed = json.loads(text_content)
-
-        if "resource" not in parsed or not parsed["resource"]:
-            raise ValueError("Primary AI output missing required field 'resource'.")
-
-        if "requires_approval" not in parsed:
-            raise ValueError("Primary AI output missing required field 'requires_approval'.")
-
-        intent_val = str(parsed.get("intent", "UNKNOWN")).upper()
         try:
-            intent_enum = IntentEnum(intent_val)
-        except ValueError:
-            raise ValueError(f"Primary AI returned unknown or invalid intent: {intent_val}")
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        f"Primary OpenAI API returned HTTP status {response.status_code}"
+                    )
 
-        risk_val = str(parsed.get("risk", "HIGH")).upper()
-        try:
-            risk_enum = RiskEnum(risk_val)
-        except ValueError:
-            raise ValueError(f"Primary AI returned invalid risk value: {risk_val}")
+                res_json = response.json()
+                choices = res_json.get("choices", [])
+                if not choices or not isinstance(choices, list):
+                    raise ValueError("Primary OpenAI returned no choices in response.")
 
-        return ClassifierResult(
-            intent=intent_enum,
-            resource=str(parsed["resource"]),
-            risk=risk_enum,
-            requires_approval=bool(parsed["requires_approval"]),
-        )
+                content = choices[0].get("message", {}).get("content", "")
+                if not content:
+                    raise ValueError("Primary OpenAI returned empty content.")
+
+                return parse_and_validate_classifier_json(content, provider_name="Primary OpenAI")
+        except httpx.TimeoutException as te:
+            raise RuntimeError(f"Primary OpenAI API timed out after {self.timeout}s: {te}")
+        except httpx.RequestError as re:
+            raise RuntimeError(f"Primary OpenAI API request failed: {re}")

@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     PRIMARY_MODEL: str = "gpt-4o-mini"
     PRIMARY_BASE_URL: str = "https://api.openai.com/v1"
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.5-flash"
+    GEMINI_MODEL: str = "gemini-1.5-flash"
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "openai/gpt-oss-20b"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # Rate Limiting Configuration
     RATE_LIMIT_PER_MINUTE: int = 60
@@ -122,12 +122,12 @@ def validate_production_config():
         if not (settings.is_upstash_configured or settings.has_remote_redis):
             raise RuntimeError("Production Configuration Error: Production Redis configuration is missing. Configure UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN or a remote REDIS_URL in production.")
 
-        # Check AI Provider Keys (at least Gemini or Groq must be configured for AI provider operations)
+        # Check AI Provider Keys (at least Primary OpenAI, Gemini, or Groq must be configured)
         has_gemini = bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY not in DANGEROUS_DUMMY_KEYS)
         has_groq = bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY not in DANGEROUS_DUMMY_KEYS)
         has_primary = bool(settings.PRIMARY_API_KEY and settings.PRIMARY_API_KEY not in DANGEROUS_DUMMY_KEYS)
         if not (has_gemini or has_groq or has_primary):
-            raise RuntimeError("Production Configuration Error: Required AI provider credentials (GEMINI_API_KEY, GROQ_API_KEY, or PRIMARY_API_KEY) are missing in production.")
+            raise RuntimeError("Production Configuration Error: Required AI provider credentials (PRIMARY_API_KEY, GEMINI_API_KEY, or GROQ_API_KEY) are missing in production.")
 
         # Check N8N_WEBHOOK_SECRET if approval webhook is defined
         if settings.N8N_APPROVAL_WEBHOOK_URL:

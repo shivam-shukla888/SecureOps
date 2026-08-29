@@ -412,14 +412,22 @@ export const RequestGatewayView: React.FC = () => {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
                       <span className="truncate">
-                        2. AI Classification ({result.provider_used.toUpperCase()})
+                        2. AI Classification ({result.provider_used === 'none' ? 'UNAVAILABLE' : result.provider_used.toUpperCase()})
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-slate-400">
-                        Risk: <strong className={result.ai_risk === 'HIGH' ? 'text-rose-400' : 'text-slate-200'}>{result.ai_risk}</strong>
-                      </span>
-                      <span className="text-[10px] text-emerald-400 uppercase font-semibold">CLASSIFIED</span>
+                      {result.provider_used === 'none' ? (
+                        <span className="text-[10px] text-amber-400 uppercase font-semibold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          PROVIDER UNAVAILABLE
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-[10px] text-slate-400">
+                            Risk: <strong className={result.ai_risk === 'HIGH' ? 'text-rose-400' : 'text-slate-200'}>{result.ai_risk}</strong>
+                          </span>
+                          <span className="text-[10px] text-emerald-400 uppercase font-semibold">CLASSIFIED</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -513,13 +521,42 @@ export const RequestGatewayView: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* AI Classification Details */}
                 <div className="p-4 rounded-xl bg-[#111827] border border-slate-800/80 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-                    <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
-                    <h4 className="text-xs font-semibold text-white font-mono uppercase">
-                      AI Classifier Output
-                    </h4>
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                      <h4 className="text-xs font-semibold text-white font-mono uppercase">
+                        AI Classifier Output
+                      </h4>
+                    </div>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-semibold ${
+                      result.provider_used === 'none'
+                        ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20'
+                        : 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+                    }`}>
+                      {result.provider_used === 'none' ? 'PROVIDER UNAVAILABLE' : 'SUCCESS'}
+                    </span>
                   </div>
+
+                  {result.provider_used === 'none' && (
+                    <div className="p-2.5 rounded-lg bg-rose-950/20 border border-rose-800/40 text-[11px] font-mono text-rose-300">
+                      <div className="font-bold text-rose-200">AI CLASSIFIER UNAVAILABLE</div>
+                      <div className="text-slate-400 text-[10px] mt-0.5">Fail-Closed Safety Policy Active (UNKNOWN / HIGH Risk)</div>
+                    </div>
+                  )}
+
                   <div className="space-y-2 font-mono text-xs">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-slate-400">AI Provider:</span>
+                      <strong className="text-purple-300 text-right uppercase">
+                        {result.provider_used === 'none' ? 'NONE' : result.provider_used}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-slate-400">Fallback Used:</span>
+                      <strong className={`text-right ${result.fallback_used ? 'text-amber-400' : 'text-slate-200'}`}>
+                        {result.fallback_used ? 'YES' : 'NO'}
+                      </strong>
+                    </div>
                     <div className="flex justify-between gap-2">
                       <span className="text-slate-400">Classified Intent:</span>
                       <strong className="text-slate-200 text-right break-words">{result.intent}</strong>
@@ -540,12 +577,6 @@ export const RequestGatewayView: React.FC = () => {
                         }
                       >
                         {result.ai_risk}
-                      </strong>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <span className="text-slate-400">AI Provider:</span>
-                      <strong className="text-purple-300 text-right">
-                        {result.provider_used} {result.fallback_used ? '(Fallback)' : ''}
                       </strong>
                     </div>
                   </div>

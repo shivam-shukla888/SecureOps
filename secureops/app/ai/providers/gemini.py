@@ -1,23 +1,36 @@
-import json
 import logging
 from typing import Optional
 import httpx
 
 from app.config import settings
-from app.schemas.decision import ClassifierResult, IntentEnum, RiskEnum
-from app.ai.providers.base import BaseAIProvider
+from app.schemas.decision import ClassifierResult
+from app.ai.providers.base import BaseAIProvider, parse_and_validate_classifier_json
 from app.ai.prompts import SYSTEM_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(BaseAIProvider):
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
-        self.api_key = api_key or settings.GEMINI_API_KEY
-        self.model = model or settings.GEMINI_MODEL
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout: float = 10.0,
+    ):
+        self.api_key = api_key if api_key is not None else settings.GEMINI_API_KEY
+        self.model = model if model is not None else settings.GEMINI_MODEL
+        self.timeout = timeout
+
+    @property
+    def name(self) -> str:
+        return "gemini"
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key and self.api_key.strip())
 
     async def classify_request(self, user_request: str) -> ClassifierResult:
-        if not self.api_key:
+        if not self.is_configured:
             raise ValueError("GEMINI_API_KEY is not configured.")
 
         # Try using google-genai SDK if available
@@ -34,23 +47,22 @@ class GeminiProvider(BaseAIProvider):
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_CLASSIFICATION_PROMPT,
                     response_mime_type="application/json",
-                    response_schema=ClassifierResult,
                     temperature=0.0,
                 ),
             )
             
             if response.text:
-                data = json.loads(response.text)
-                return ClassifierResult(**data)
+                return parse_and_validate_classifier_json(response.text, provider_name="Gemini")
         except ImportError:
             logger.info("google-genai SDK not found; using direct HTTP REST API for Gemini.")
         except Exception as err:
-            logger.warning(f"SDK classification failed: {err}; falling back to HTTP REST call.")
+            logger.warning(f"Gemini SDK call failed: {type(err).__name__}; falling back to HTTP REST call.")
 
         # Fallback to direct HTTP REST API call to Gemini
         return await self._classify_via_http(user_request)
 
     async def _classify_via_http(self, user_request: str) -> ClassifierResult:
+        # Note: Avoid embedding API key in query parameters directly in error messages
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
         
         payload = {
@@ -72,48 +84,25 @@ class GeminiProvider(BaseAIProvider):
             }
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, json=payload)
-            if response.status_code != 200:
-                raise RuntimeError(
-                    f"Gemini API returned HTTP {response.status_code}: {response.text}"
-                )
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(url, json=payload)
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        f"Gemini API returned HTTP status {response.status_code}"
+                    )
 
-            res_json = response.json()
-            candidates = res_json.get("candidates", [])
-            if not candidates:
-                raise ValueError("No candidates returned from Gemini API.")
+                res_json = response.json()
+                candidates = res_json.get("candidates", [])
+                if not candidates or not isinstance(candidates, list):
+                    raise ValueError("No candidates returned from Gemini API.")
 
-            text_content = candidates[0]["content"]["parts"][0]["text"]
-            
-            # Clean markdown code blocks if model included them
-            text_content = text_content.strip()
-            if text_content.startswith("```json"):
-                text_content = text_content[7:]
-            if text_content.startswith("```"):
-                text_content = text_content[3:]
-            if text_content.endswith("```"):
-                text_content = text_content[:-3]
-            text_content = text_content.strip()
+                text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                if not text_content:
+                    raise ValueError("Gemini returned empty candidate content.")
 
-            parsed = json.loads(text_content)
-            
-            # Validate IntentEnum and RiskEnum
-            intent_val = parsed.get("intent", "UNKNOWN").upper()
-            try:
-                intent_enum = IntentEnum(intent_val)
-            except ValueError:
-                intent_enum = IntentEnum.UNKNOWN
-
-            risk_val = parsed.get("risk", "HIGH").upper()
-            try:
-                risk_enum = RiskEnum(risk_val)
-            except ValueError:
-                risk_enum = RiskEnum.HIGH
-
-            return ClassifierResult(
-                intent=intent_enum,
-                resource=str(parsed.get("resource", "unknown")),
-                risk=risk_enum,
-                requires_approval=bool(parsed.get("requires_approval", True)),
-            )
+                return parse_and_validate_classifier_json(text_content, provider_name="Gemini")
+        except httpx.TimeoutException as te:
+            raise RuntimeError(f"Gemini API timed out after {self.timeout}s: {te}")
+        except httpx.RequestError as re:
+            raise RuntimeError(f"Gemini API request failed: {re}")
