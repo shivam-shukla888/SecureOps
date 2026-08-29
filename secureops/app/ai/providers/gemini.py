@@ -40,7 +40,7 @@ class GeminiProvider(BaseAIProvider):
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 10.0,
+        timeout: float = 15.0,
     ):
         self._explicit_api_key = api_key
         self._explicit_model = model
@@ -72,7 +72,7 @@ class GeminiProvider(BaseAIProvider):
         if not self.is_configured:
             raise ValueError("GEMINI_API_KEY is not configured.")
 
-        # 1. Attempt direct async HTTP REST API call
+        # 1. Attempt direct async HTTP REST API call (fastest & most reliable)
         try:
             return await self._classify_via_http(user_request)
         except Exception as http_err:
@@ -108,25 +108,22 @@ class GeminiProvider(BaseAIProvider):
         raise RuntimeError("Gemini classification failed via both HTTP REST and SDK.")
 
     async def _classify_via_http(self, user_request: str) -> ClassifierResult:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        # Use query parameter key which is universally supported across Google API endpoints
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
         headers = {
             "x-goog-api-key": self.api_key,
             "Content-Type": "application/json",
         }
 
+        # Single unified prompt payload compatible with all Gemini model versions
         payload = {
             "contents": [
                 {
                     "parts": [
-                        {"text": f"User Request:\n{user_request}"}
+                        {"text": f"{SYSTEM_CLASSIFICATION_PROMPT}\n\nUser Request:\n{user_request}"}
                     ]
                 }
             ],
-            "systemInstruction": {
-                "parts": [
-                    {"text": SYSTEM_CLASSIFICATION_PROMPT}
-                ]
-            },
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "temperature": 0.0
@@ -136,27 +133,9 @@ class GeminiProvider(BaseAIProvider):
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, json=payload, headers=headers)
-                
-                # If systemInstruction format fails on certain v1beta endpoints, retry with combined prompt
-                if response.status_code != 200:
-                    combined_payload = {
-                        "contents": [
-                            {
-                                "parts": [
-                                    {"text": f"{SYSTEM_CLASSIFICATION_PROMPT}\n\nUser Request:\n{user_request}"}
-                                ]
-                            }
-                        ],
-                        "generationConfig": {
-                            "responseMimeType": "application/json",
-                            "temperature": 0.0
-                        }
-                    }
-                    response = await client.post(url, json=combined_payload, headers=headers)
-
                 if response.status_code != 200:
                     raise RuntimeError(
-                        f"Gemini API returned HTTP status {response.status_code}"
+                        f"Gemini API returned HTTP_{response.status_code}"
                     )
 
                 res_json = response.json()

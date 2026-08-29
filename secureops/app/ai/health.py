@@ -1,6 +1,7 @@
 import time
 import asyncio
 import logging
+import re
 from typing import Dict, Any, Optional
 
 from app.ai.providers.base import BaseAIProvider
@@ -37,8 +38,8 @@ async def check_provider_health(provider: BaseAIProvider) -> Dict[str, Any]:
     # Perform lightweight operational test with "What is 2+2?"
     start_time = time.time()
     try:
-        # Run with strict timeout
-        result = await asyncio.wait_for(provider.classify_request("What is 2+2?"), timeout=5.0)
+        # Run with generous 12.0s timeout to allow for cold starts
+        result = await asyncio.wait_for(provider.classify_request("What is 2+2?"), timeout=12.0)
         latency_ms = (time.time() - start_time) * 1000.0
         health_info = {
             "configured": True,
@@ -53,15 +54,28 @@ async def check_provider_health(provider: BaseAIProvider) -> Dict[str, Any]:
     except Exception as exc:
         latency_ms = (time.time() - start_time) * 1000.0
         failure_category = type(exc).__name__
+        exc_str = str(exc)
+        
+        # Safely extract HTTP status code if present (e.g. HTTP 401, HTTP 400)
+        status_match = re.search(r"HTTP[_\s](\d{3})", exc_str)
+        if status_match:
+            status_code_str = f"HTTP_{status_match.group(1)}"
+        elif "Timeout" in failure_category or "timed out" in exc_str.lower():
+            status_code_str = "TIMEOUT"
+        elif "Safety" in failure_category or "SAFETY" in exc_str:
+            status_code_str = "SAFETY_BLOCKED"
+        else:
+            status_code_str = failure_category.upper()
+
         logger.warning(
-            f"[AI Diagnostics] Health check failed for provider '{provider_name}' ({model_name}): {failure_category}"
+            f"[AI Diagnostics] Health check failed for provider '{provider_name}' ({model_name}): {status_code_str}"
         )
         health_info = {
             "configured": True,
             "operational": False,
             "model": model_name,
             "latency_ms": round(latency_ms, 1),
-            "status": "FAILED",
+            "status": status_code_str,
             "failure_category": failure_category,
             "_cached_at": now,
         }

@@ -38,7 +38,7 @@ class GroqProvider(BaseAIProvider):
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 10.0,
+        timeout: float = 15.0,
     ):
         self._explicit_api_key = api_key
         self._explicit_model = model
@@ -122,7 +122,7 @@ class GroqProvider(BaseAIProvider):
 
                 if response.status_code != 200:
                     raise RuntimeError(
-                        f"Groq API returned HTTP status {response.status_code}"
+                        f"Groq API returned HTTP_{response.status_code}"
                     )
 
                 res_json = response.json()
