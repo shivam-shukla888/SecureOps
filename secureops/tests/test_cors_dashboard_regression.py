@@ -81,6 +81,10 @@ def test_4_dashboard_with_valid_api_key_returns_200(client, test_credentials):
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://secureops.vercel.app",
+    "https://secureops-frontend.vercel.app",
+    "https://secureops-preview-git-main-org.vercel.app",
+    "https://secureops-gateway.onrender.com",
 ])
 def test_5_6_7_9_browser_options_dashboard_cors_preflight_success(client, origin):
     """

@@ -79,6 +79,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.agents import router as agents_router
 from app.routes.evaluations import router as evaluations_router
 from app.routes.benchmarks import router as benchmarks_router
+from app.routes.dashboard import router as dashboard_router
 
 app = FastAPI(
     title="SecureOps Gateway API",
@@ -93,11 +94,13 @@ app = FastAPI(
 app.include_router(agents_router)
 app.include_router(evaluations_router)
 app.include_router(benchmarks_router)
+app.include_router(dashboard_router)
 
 # Global exception handlers & middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Accept", "Origin"],
@@ -575,36 +578,6 @@ async def list_security_events(
         "tenant_id": ctx.tenant_id,
         "count": len(events),
         "events": events,
-    }
-
-
-# --- DASHBOARD SUMMARY API ENDPOINT ---
-
-@app.get("/v1/dashboard/summary", tags=["Dashboard"])
-async def get_dashboard_summary(
-    request: Request,
-    api_key: str = Depends(verify_api_key),
-):
-    ctx: TenantUserContext = request.state.user_context
-    audit_events = await in_memory_audit_repo.list_audit_events(tenant_id=ctx.tenant_id, limit=500)
-    tickets = await in_memory_approval_repo.list_tickets(tenant_id=ctx.tenant_id)
-    sec_events = siem_manager.list_tenant_security_events(tenant_id=ctx.tenant_id)
-
-    allowed = sum(1 for e in audit_events if e.get("final_decision") == "ALLOW")
-    blocked = sum(1 for e in audit_events if e.get("final_decision") == "BLOCK")
-    pending = sum(1 for t in tickets if t.status == "PENDING")
-
-    return {
-        "tenant_id": ctx.tenant_id,
-        "user_id": ctx.user_id,
-        "role": ctx.role.value,
-        "requests_today": len(audit_events),
-        "allowed_requests": allowed,
-        "blocked_requests": blocked,
-        "pending_approvals": pending,
-        "security_events": len(sec_events),
-        "provider_fallbacks": sum(1 for e in audit_events if e.get("fallback_used")),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

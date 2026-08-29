@@ -52,6 +52,7 @@ class Settings(BaseSettings):
 
     # CORS Configuration
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
+    CORS_ORIGIN_REGEX: str = r"^https://([a-zA-Z0-9_-]+\.)*(vercel\.app|onrender\.com)$"
 
     @property
     def cors_origins_list(self) -> List[str]:
