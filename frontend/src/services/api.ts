@@ -11,8 +11,22 @@ import {
   CreateCredentialResponse,
 } from '../types/api';
 
-const RAW_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').trim();
-const BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
+export const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  const isBrowser = typeof window !== 'undefined';
+  const isNonLocalhost = isBrowser && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) {
+    const cleanUrl = envUrl.trim().replace(/['"]/g, '').replace(/\/+$/, '');
+    if ((import.meta.env.PROD || isNonLocalhost) && (cleanUrl.includes('localhost') || cleanUrl.includes('127.0.0.1'))) {
+      return 'https://secureops-gateway.onrender.com';
+    }
+    return cleanUrl;
+  }
+  return 'https://secureops-gateway.onrender.com';
+};
+
+export const BASE_URL = getApiBaseUrl();
 
 export class APIError extends Error {
   statusCode: number;

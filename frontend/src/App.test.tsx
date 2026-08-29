@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { getApiBaseUrl, BASE_URL } from './services/api';
 
 describe('SecureOps Frontend Security & API Tests', () => {
-  it('verifies environment base URL default', () => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-    expect(baseUrl).toBe('http://127.0.0.1:8000');
+  it('verifies environment base URL default points to production Render gateway', () => {
+    const url = getApiBaseUrl();
+    expect(url).toBe('https://secureops-gateway.onrender.com');
+    expect(BASE_URL).toBe('https://secureops-gateway.onrender.com');
   });
 
   it('validates single Bearer prefix formatting logic', () => {
@@ -20,5 +22,13 @@ describe('SecureOps Frontend Security & API Tests', () => {
     const roles = ['OWNER', 'ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER'];
     expect(roles).toContain('OWNER');
     expect(roles).toContain('APPROVER');
+  });
+
+  it('evaluates gateway online status correctly for ready and healthy responses', () => {
+    const isReadyOnline = (res: { status: string }) => res && (res.status === 'ready' || res.status === 'healthy');
+    expect(isReadyOnline({ status: 'ready' })).toBe(true);
+    expect(isReadyOnline({ status: 'healthy' })).toBe(true);
+    expect(isReadyOnline({ status: 'unhealthy' })).toBe(false);
+    expect(isReadyOnline({ status: 'degraded' })).toBe(false);
   });
 });

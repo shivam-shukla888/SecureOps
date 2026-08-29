@@ -6,21 +6,42 @@ import { RoleEnum } from '../../types/api';
 
 export const Topbar: React.FC = () => {
   const { tenantId, setTenantId, userRole, setUserRole } = useAuth();
-  const [healthStatus, setHealthStatus] = useState<'healthy' | 'unhealthy' | 'loading'>('loading');
+  const [gatewayOnline, setGatewayOnline] = useState<boolean>(true);
 
   useEffect(() => {
-    const checkHealth = async () => {
+    let isMounted = true;
+
+    const checkGatewayStatus = async () => {
+      let isOnline = false;
       try {
-        const res = await api.getHealth();
-        setHealthStatus(res.status === 'healthy' ? 'healthy' : 'unhealthy');
+        // Prefer /ready check since it verifies db, redis, and rate limiter
+        const readyRes = await api.getReady();
+        if (readyRes && (readyRes.status === 'ready' || readyRes.status === 'healthy')) {
+          isOnline = true;
+        }
       } catch {
-        setHealthStatus('unhealthy');
+        // Fallback to /health check
+        try {
+          const healthRes = await api.getHealth();
+          if (healthRes && (healthRes.status === 'healthy' || healthRes.status === 'ready')) {
+            isOnline = true;
+          }
+        } catch {
+          isOnline = false;
+        }
+      }
+
+      if (isMounted) {
+        setGatewayOnline(isOnline);
       }
     };
 
-    checkHealth();
-    const interval = setInterval(checkHealth, 15000);
-    return () => clearInterval(interval);
+    checkGatewayStatus();
+    const interval = setInterval(checkGatewayStatus, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -54,7 +75,7 @@ export const Topbar: React.FC = () => {
         <div className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-[#141c2e] border border-slate-800">
           <Activity className="w-3.5 h-3.5 text-slate-400" />
           <span className="text-slate-400">Gateway:</span>
-          {healthStatus === 'healthy' ? (
+          {gatewayOnline ? (
             <span className="text-emerald-400 font-bold flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               ONLINE
