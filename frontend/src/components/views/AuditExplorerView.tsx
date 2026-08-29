@@ -72,25 +72,25 @@ export const AuditExplorerView: React.FC = () => {
     : 'Live';
 
   return (
-    <div className="space-y-6 select-none">
+    <div className="space-y-4 sm:space-y-6 select-none max-w-full">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold text-white tracking-tight font-mono uppercase">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2 border-b border-slate-800/80">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight font-mono uppercase truncate">
               AUDIT EXPLORER
             </h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shrink-0">
               IMMUTABLE AUDIT TRAIL
             </span>
           </div>
-          <p className="text-xs text-slate-400 font-mono mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-mono mt-1">
             Trace request activity and inspect cryptographically verifiable audit records.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[11px] font-mono text-slate-400">
+        <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[10px] sm:text-[11px] font-mono text-slate-400">
             <span>
               Tenant: <strong className="text-slate-200">{tenantId}</strong>
             </span>
@@ -102,8 +102,9 @@ export const AuditExplorerView: React.FC = () => {
 
           <button
             onClick={() => refetch()}
-            className="px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 hover:border-cyan-500/40 text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-lg bg-[#111827] border border-slate-800 hover:border-cyan-500/40 text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             title="Refresh audit event log"
+            aria-label="Refresh audit event log"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Refresh</span>
@@ -113,8 +114,8 @@ export const AuditExplorerView: React.FC = () => {
 
       {/* Filter Controls Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Decision Filter Pills */}
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#111827] border border-slate-800 text-xs font-mono">
+        {/* Decision Filter Pills (Horizontally scrollable) */}
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#111827] border border-slate-800 text-xs font-mono overflow-x-auto max-w-full custom-scrollbar">
           {['ALL', 'ALLOW', 'REQUIRE_APPROVAL', 'BLOCK'].map((dec) => (
             <button
               key={dec}
@@ -122,7 +123,7 @@ export const AuditExplorerView: React.FC = () => {
                 setDecisionFilter(dec);
                 setSelectedLog(null);
               }}
-              className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
+              className={`px-3 py-2 sm:py-1 min-h-[44px] sm:min-h-0 rounded-md transition-colors cursor-pointer whitespace-nowrap flex items-center shrink-0 ${
                 decisionFilter === dec
                   ? 'bg-slate-800 text-white font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -136,20 +137,20 @@ export const AuditExplorerView: React.FC = () => {
         {/* Search & Reset */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search request ID, user, resource..."
-              className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-1.5 pl-8 pr-3 text-xs text-slate-200 font-mono focus:outline-none placeholder:text-slate-600"
+              className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-2 sm:py-1.5 pl-8 pr-3 text-xs text-slate-200 font-mono focus:outline-none placeholder:text-slate-600 min-h-[44px] sm:min-h-0"
             />
           </div>
 
           {(decisionFilter !== 'ALL' || searchTerm) && (
             <button
               onClick={handleResetFilters}
-              className="px-2.5 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer"
+              className="px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
               title="Reset active filters"
             >
               <RotateCcw className="w-3 h-3" />
@@ -159,12 +160,12 @@ export const AuditExplorerView: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid: Audit Log Table (7 cols) + Detail Inspector (5 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Grid: Audit Log Table (7 cols on lg) + Detail Inspector (5 cols on lg) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* Left Column: Audit Records Table */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 w-full">
           <div className="rounded-xl bg-[#111827] border border-slate-800/80 overflow-hidden">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between">
               <span className="text-xs font-mono text-slate-400 font-medium">
                 {filteredLogs.length} {filteredLogs.length === 1 ? 'Record' : 'Records'} Logged
               </span>
@@ -175,23 +176,23 @@ export const AuditExplorerView: React.FC = () => {
             </div>
 
             {isLoading ? (
-              <div className="p-12 text-center text-slate-500 font-mono text-xs space-y-2">
+              <div className="p-8 sm:p-12 text-center text-slate-500 font-mono text-xs space-y-2">
                 <RefreshCw className="w-5 h-5 animate-spin mx-auto text-cyan-400" />
                 <p>Loading forensic audit trail...</p>
               </div>
             ) : isError ? (
-              <div className="p-8 text-center text-rose-400 font-mono text-xs space-y-2">
+              <div className="p-6 sm:p-8 text-center text-rose-400 font-mono text-xs space-y-2">
                 <AlertTriangle className="w-5 h-5 mx-auto text-rose-400" />
                 <p>Failed to load audit records. {(fetchError as any)?.message || ''}</p>
                 <button
                   onClick={() => refetch()}
-                  className="px-3 py-1 rounded bg-rose-500/20 text-rose-300 text-xs mt-2"
+                  className="px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded bg-rose-500/20 text-rose-300 text-xs mt-2 cursor-pointer"
                 >
                   Retry
                 </button>
               </div>
             ) : filteredLogs.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 font-mono text-xs space-y-2">
+              <div className="p-8 sm:p-12 text-center text-slate-500 font-mono text-xs space-y-2">
                 <ShieldCheck className="w-8 h-8 mx-auto text-slate-600" />
                 <p className="text-slate-300 font-medium">No audit records</p>
                 <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
@@ -199,8 +200,8 @@ export const AuditExplorerView: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-left border-collapse min-w-[500px] sm:min-w-0">
                   <thead>
                     <tr className="border-b border-slate-800 bg-[#0e1422] text-[10px] font-mono uppercase text-slate-400">
                       <th className="p-3">Request ID</th>
@@ -223,23 +224,23 @@ export const AuditExplorerView: React.FC = () => {
                           }`}
                         >
                           <td className="p-3">
-                            <span className="text-cyan-400 font-bold block select-all">
+                            <span className="text-cyan-400 font-bold block select-all break-all">
                               {log.request_id}
                             </span>
-                            <span className="text-[10px] text-slate-500">
+                            <span className="text-[10px] text-slate-500 whitespace-nowrap">
                               {new Date(log.timestamp).toLocaleTimeString()}
                             </span>
                           </td>
-                          <td className="p-3 text-slate-300">{log.user_id}</td>
+                          <td className="p-3 text-slate-300 break-all">{log.user_id}</td>
                           <td className="p-3">
-                            <span className="text-slate-200 block">{log.intent}</span>
+                            <span className="text-slate-200 block break-words">{log.intent}</span>
                             <span className="text-[10px] text-slate-500 truncate max-w-[140px] block">
                               {log.resource}
                             </span>
                           </td>
                           <td className="p-3">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 ${
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 shrink-0 ${
                                 dec === 'ALLOW'
                                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                   : dec === 'REQUIRE_APPROVAL'
@@ -250,7 +251,7 @@ export const AuditExplorerView: React.FC = () => {
                               {dec}
                             </span>
                           </td>
-                          <td className="p-3 text-right text-slate-400 text-[11px]">
+                          <td className="p-3 text-right text-slate-400 text-[11px] whitespace-nowrap">
                             {typeof log.latency_ms === 'number'
                               ? `${log.latency_ms.toFixed(1)} ms`
                               : '--'}
@@ -266,20 +267,20 @@ export const AuditExplorerView: React.FC = () => {
         </div>
 
         {/* Right Column: Forensic Detail Inspector */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 space-y-4 w-full">
           {selectedLog ? (
-            <div className="p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4 font-mono text-xs">
-              <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div className="p-4 sm:p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4 font-mono text-xs">
+              <div className="border-b border-slate-800 pb-3 flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <h3 className="font-bold text-white text-sm font-mono uppercase">
+                  <h3 className="font-bold text-white text-xs sm:text-sm font-mono uppercase">
                     Forensic Audit Detail
                   </h3>
-                  <span className="text-[10px] text-cyan-400 select-all">
+                  <span className="text-[10px] text-cyan-400 select-all break-all">
                     {selectedLog.request_id}
                   </span>
                 </div>
                 <span
-                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
                     selectedLog.final_decision === 'ALLOW'
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       : selectedLog.final_decision === 'REQUIRE_APPROVAL'
@@ -297,21 +298,21 @@ export const AuditExplorerView: React.FC = () => {
                   Request Identity
                 </div>
                 <div className="p-3 rounded-lg bg-[#0e1422] border border-slate-800 space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Request ID:</span>
-                    <strong className="text-slate-200 select-all">{selectedLog.request_id}</strong>
+                    <strong className="text-slate-200 select-all text-right break-all">{selectedLog.request_id}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Tenant ID:</span>
-                    <strong className="text-slate-200">{selectedLog.tenant_id}</strong>
+                    <strong className="text-slate-200 text-right break-all">{selectedLog.tenant_id}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Requester User:</span>
-                    <strong className="text-slate-200">{selectedLog.user_id}</strong>
+                    <strong className="text-slate-200 text-right break-all">{selectedLog.user_id}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Timestamp:</span>
-                    <span className="text-slate-300 text-[11px]">
+                    <span className="text-slate-300 text-[11px] text-right">
                       {new Date(selectedLog.timestamp).toLocaleString()}
                     </span>
                   </div>
@@ -324,15 +325,15 @@ export const AuditExplorerView: React.FC = () => {
                   Security & Policy Evaluation
                 </div>
                 <div className="p-3 rounded-lg bg-[#0e1422] border border-slate-800 space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Intent:</span>
-                    <strong className="text-slate-200">{selectedLog.intent}</strong>
+                    <strong className="text-slate-200 text-right break-words">{selectedLog.intent}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Target Resource:</span>
-                    <strong className="text-slate-200">{selectedLog.resource}</strong>
+                    <strong className="text-slate-200 text-right break-words">{selectedLog.resource}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">AI Risk Score:</span>
                     <strong
                       className={
@@ -346,7 +347,7 @@ export const AuditExplorerView: React.FC = () => {
                       {selectedLog.ai_risk}
                     </strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Policy Risk Level:</span>
                     <strong
                       className={
@@ -360,14 +361,14 @@ export const AuditExplorerView: React.FC = () => {
                       {selectedLog.policy_risk}
                     </strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">AI Provider:</span>
-                    <span className="text-purple-300">
+                    <span className="text-purple-300 text-right">
                       {selectedLog.provider}{' '}
                       {selectedLog.fallback_used ? '(Fallback Engaged)' : ''}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Pipeline Latency:</span>
                     <span className="text-cyan-400">{selectedLog.latency_ms.toFixed(1)} ms</span>
                   </div>
@@ -380,22 +381,22 @@ export const AuditExplorerView: React.FC = () => {
                   Request Lifecycle Trace
                 </div>
                 <div className="p-3 rounded-lg bg-[#0e1422] border border-slate-800 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] gap-2">
                     <span className="text-slate-400">1. Ingest & Rate Limit</span>
-                    <span className="text-emerald-400">PASS</span>
+                    <span className="text-emerald-400 shrink-0">PASS</span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] gap-2">
                     <span className="text-slate-400">2. AI Intent Classification</span>
-                    <span className="text-purple-300">{selectedLog.intent}</span>
+                    <span className="text-purple-300 truncate">{selectedLog.intent}</span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] gap-2">
                     <span className="text-slate-400">3. Deterministic Policy</span>
-                    <span className="text-cyan-400">{selectedLog.policy_risk} RISK</span>
+                    <span className="text-cyan-400 shrink-0">{selectedLog.policy_risk} RISK</span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] gap-2">
                     <span className="text-slate-400">4. Authorization Verdict</span>
                     <span
-                      className={`font-bold ${
+                      className={`font-bold shrink-0 ${
                         selectedLog.final_decision === 'ALLOW'
                           ? 'text-emerald-400'
                           : selectedLog.final_decision === 'REQUIRE_APPROVAL'
@@ -406,28 +407,28 @@ export const AuditExplorerView: React.FC = () => {
                       {selectedLog.final_decision}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] gap-2">
                     <span className="text-slate-400">5. SHA-256 Audit Commitment</span>
-                    <span className="text-emerald-400 font-bold">COMMITTED</span>
+                    <span className="text-emerald-400 font-bold shrink-0">COMMITTED</span>
                   </div>
                 </div>
               </div>
 
               {/* Raw Audit Record JSON */}
-              <div className="space-y-2">
+              <div className="space-y-2 max-w-full overflow-hidden">
                 <div className="flex items-center justify-between">
                   <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                     Redacted Audit Record Payload
                   </div>
                   <span className="text-[10px] text-slate-500">Real Log Payload</span>
                 </div>
-                <pre className="p-3 rounded-lg bg-[#0a0f1b] border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-x-auto whitespace-pre-wrap">
+                <pre className="p-3 rounded-lg bg-[#0a0f1b] border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-x-auto whitespace-pre max-w-full">
                   {JSON.stringify(selectedLog, null, 2)}
                 </pre>
               </div>
             </div>
           ) : (
-            <div className="p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto">
                 <FileText className="w-5 h-5" />
               </div>

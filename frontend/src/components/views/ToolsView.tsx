@@ -232,25 +232,25 @@ export const ToolsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 select-none">
+    <div className="space-y-4 sm:space-y-6 select-none max-w-full">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold text-white tracking-tight font-mono uppercase">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2 border-b border-slate-800/80">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight font-mono uppercase truncate">
               TOOL GOVERNANCE
             </h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shrink-0">
               5 GOVERNED TOOLS
             </span>
           </div>
-          <p className="text-xs text-slate-400 font-mono mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-mono mt-1">
             Manage and inspect the tools available to governed AI agents.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[11px] font-mono text-slate-400">
+        <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[10px] sm:text-[11px] font-mono text-slate-400">
             <span>
               Tenant: <strong className="text-slate-200">{tenantId}</strong>
             </span>
@@ -264,13 +264,13 @@ export const ToolsView: React.FC = () => {
 
       {/* Filter Controls Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Risk & Approval Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[#111827] border border-slate-800 text-xs font-mono">
+        {/* Risk & Approval Filter Pills (Horizontally scrollable) */}
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#111827] border border-slate-800 text-xs font-mono overflow-x-auto max-w-full custom-scrollbar">
           {['ALL', 'LOW', 'MEDIUM', 'HIGH'].map((risk) => (
             <button
               key={risk}
               onClick={() => setRiskFilter(risk)}
-              className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
+              className={`px-3 py-2 sm:py-1 min-h-[44px] sm:min-h-0 rounded-md transition-colors cursor-pointer whitespace-nowrap flex items-center shrink-0 ${
                 riskFilter === risk
                   ? 'bg-slate-800 text-white font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -284,20 +284,20 @@ export const ToolsView: React.FC = () => {
         {/* Search & Reset */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search tool, intent, parameter..."
-              className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-1.5 pl-8 pr-3 text-xs text-slate-200 font-mono focus:outline-none placeholder:text-slate-600"
+              className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-2 sm:py-1.5 pl-8 pr-3 text-xs text-slate-200 font-mono focus:outline-none placeholder:text-slate-600 min-h-[44px] sm:min-h-0"
             />
           </div>
 
           {(riskFilter !== 'ALL' || approvalFilter !== 'ALL' || searchTerm) && (
             <button
               onClick={handleResetFilters}
-              className="px-2.5 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer"
+              className="px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
               title="Reset active filters"
             >
               <RotateCcw className="w-3 h-3" />
@@ -307,12 +307,12 @@ export const ToolsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid: Tool Inventory Table (7 cols) + Detail Inspector (5 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Grid: Tool Inventory Table (7 cols on lg) + Detail Inspector (5 cols on lg) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* Left Column: Governed Tool Inventory */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 w-full">
           <div className="rounded-xl bg-[#111827] border border-slate-800/80 overflow-hidden">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between">
               <span className="text-xs font-mono text-slate-400 font-medium">
                 {filteredTools.length} Governed {filteredTools.length === 1 ? 'Tool' : 'Tools'}{' '}
                 Registered
@@ -324,7 +324,7 @@ export const ToolsView: React.FC = () => {
             </div>
 
             {filteredTools.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 font-mono text-xs space-y-2">
+              <div className="p-8 sm:p-12 text-center text-slate-500 font-mono text-xs space-y-2">
                 <Wrench className="w-8 h-8 mx-auto text-slate-600" />
                 <p className="text-slate-300 font-medium">No matching tools found</p>
                 <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
@@ -332,8 +332,8 @@ export const ToolsView: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-left border-collapse min-w-[500px] sm:min-w-0">
                   <thead>
                     <tr className="border-b border-slate-800 bg-[#0e1422] text-[10px] font-mono uppercase text-slate-400">
                       <th className="p-3">Tool Name</th>
@@ -355,12 +355,12 @@ export const ToolsView: React.FC = () => {
                           }`}
                         >
                           <td className="p-3">
-                            <span className="text-cyan-400 font-bold block">{tool.name}</span>
+                            <span className="text-cyan-400 font-bold block break-words">{tool.name}</span>
                             <span className="text-[10px] text-slate-500 truncate max-w-[160px] block">
                               {tool.description}
                             </span>
                           </td>
-                          <td className="p-3 text-slate-300">{tool.intent}</td>
+                          <td className="p-3 text-slate-300 break-all">{tool.intent}</td>
                           <td className="p-3">
                             <span
                               className={`text-[10px] font-bold ${
@@ -376,7 +376,7 @@ export const ToolsView: React.FC = () => {
                           </td>
                           <td className="p-3">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 ${
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 shrink-0 ${
                                 tool.requires_approval
                                   ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                                   : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
@@ -398,7 +398,7 @@ export const ToolsView: React.FC = () => {
           </div>
 
           {/* Architecture Explanation Callout */}
-          <div className="p-4 rounded-xl bg-[#0e1422] border border-slate-800/80 text-slate-400 text-xs flex items-start gap-2.5 font-mono">
+          <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e1422] border border-slate-800/80 text-slate-400 text-xs flex items-start gap-2.5 font-mono">
             <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
               <strong className="text-slate-200 block mb-0.5">
@@ -410,18 +410,18 @@ export const ToolsView: React.FC = () => {
         </div>
 
         {/* Right Column: Tool Detail Inspector */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 space-y-4 w-full">
           {selectedTool ? (
-            <div className="p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4 font-mono text-xs">
-              <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div className="p-4 sm:p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4 font-mono text-xs">
+              <div className="border-b border-slate-800 pb-3 flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <h3 className="font-bold text-white text-sm font-mono uppercase">
+                  <h3 className="font-bold text-white text-xs sm:text-sm font-mono uppercase">
                     Tool Specification
                   </h3>
-                  <span className="text-[10px] text-cyan-400 font-bold">{selectedTool.name}</span>
+                  <span className="text-[10px] text-cyan-400 font-bold break-all">{selectedTool.name}</span>
                 </div>
                 <span
-                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
                     selectedTool.requires_approval
                       ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                       : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
@@ -437,19 +437,19 @@ export const ToolsView: React.FC = () => {
                   Identity & Intent
                 </div>
                 <div className="p-3 rounded-lg bg-[#0e1422] border border-slate-800 space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Tool Name:</span>
-                    <strong className="text-slate-200">{selectedTool.name}</strong>
+                    <strong className="text-slate-200 text-right break-words">{selectedTool.name}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Bound Intent:</span>
-                    <strong className="text-slate-200">{selectedTool.intent}</strong>
+                    <strong className="text-slate-200 text-right break-words">{selectedTool.intent}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Category:</span>
-                    <strong className="text-cyan-300">{selectedTool.category}</strong>
+                    <strong className="text-cyan-300 text-right">{selectedTool.category}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Minimum Risk:</span>
                     <strong
                       className={
@@ -463,7 +463,7 @@ export const ToolsView: React.FC = () => {
                       {selectedTool.risk}
                     </strong>
                   </div>
-                  <div className="pt-1 border-t border-slate-800 text-[11px] text-slate-300">
+                  <div className="pt-1 border-t border-slate-800 text-[11px] text-slate-300 break-words">
                     {selectedTool.description}
                   </div>
                 </div>
@@ -480,10 +480,10 @@ export const ToolsView: React.FC = () => {
                       key={param.name}
                       className="p-3 rounded-lg bg-[#0e1422] border border-slate-800 space-y-1"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-cyan-300 font-bold">{param.name}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-cyan-300 font-bold break-all">{param.name}</span>
                         <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                          className={`text-[10px] px-1.5 py-0.2 rounded font-bold shrink-0 ${
                             param.required
                               ? 'bg-rose-500/20 text-rose-300'
                               : 'bg-slate-800 text-slate-400'
@@ -492,11 +492,11 @@ export const ToolsView: React.FC = () => {
                           {param.required ? 'REQUIRED' : 'OPTIONAL'}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-400">{param.description}</div>
+                      <div className="text-[11px] text-slate-400 break-words">{param.description}</div>
                       <div className="text-[10px] text-slate-500">
                         Type: <span className="text-slate-300">{param.type}</span>
                         {param.constraints && (
-                          <span className="block text-slate-500 mt-0.5">
+                          <span className="block text-slate-500 mt-0.5 break-words">
                             Constraints: {param.constraints}
                           </span>
                         )}
@@ -515,14 +515,14 @@ export const ToolsView: React.FC = () => {
                   {selectedTool.security_controls.map((ctrl, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-300">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>{ctrl}</span>
+                      <span className="break-words">{ctrl}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto">
                 <Wrench className="w-5 h-5" />
               </div>

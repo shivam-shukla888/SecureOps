@@ -95,25 +95,25 @@ export const TenantsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 select-none font-mono text-xs">
+    <div className="space-y-4 sm:space-y-6 select-none font-mono text-xs max-w-full">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold text-white tracking-tight uppercase">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2 border-b border-slate-800/80">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight uppercase truncate">
               TENANT MANAGEMENT
             </h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shrink-0">
               MULTI-TENANCY ISOLATION
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
             Manage multi-tenant workspace partitioning and strict security isolation boundaries.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[11px] text-slate-400">
+        <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[10px] sm:text-[11px] text-slate-400">
             <span>
               Active Tenant: <strong className="text-cyan-400 select-all">{tenantId}</strong>
             </span>
@@ -126,7 +126,7 @@ export const TenantsView: React.FC = () => {
       </div>
 
       {/* Architectural Isolation Banner */}
-      <div className="p-4 rounded-xl bg-[#0e1422] border border-slate-800/80 text-slate-400 flex items-start gap-3">
+      <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e1422] border border-slate-800/80 text-slate-400 flex items-start gap-2.5 sm:gap-3">
         <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
         <div className="text-[11px] leading-relaxed">
           <strong className="text-slate-200 block mb-0.5">
@@ -139,20 +139,20 @@ export const TenantsView: React.FC = () => {
       {/* Filter Bar */}
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 sm:w-72">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search tenant ID, name, tier..."
-            className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-1.5 pl-8 pr-3 text-xs text-slate-200 focus:outline-none placeholder:text-slate-600"
+            className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-2 sm:py-1.5 pl-8 pr-3 text-xs text-slate-200 focus:outline-none placeholder:text-slate-600 min-h-[44px] sm:min-h-0"
           />
         </div>
 
         {searchTerm && (
           <button
             onClick={() => setSearchTerm('')}
-            className="px-2.5 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
             title="Reset active search"
           >
             <RotateCcw className="w-3 h-3" />
@@ -161,12 +161,12 @@ export const TenantsView: React.FC = () => {
         )}
       </div>
 
-      {/* Main Grid: Tenant Inventory (7 cols) + Detail Inspector (5 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Grid: Tenant Inventory (7 cols on lg) + Detail Inspector (5 cols on lg) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* Left Column: Tenant Inventory */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 w-full">
           <div className="rounded-xl bg-[#111827] border border-slate-800/80 overflow-hidden">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between">
               <span className="text-slate-400 font-medium">
                 {filteredTenants.length} Partitioned{' '}
                 {filteredTenants.length === 1 ? 'Workspace' : 'Workspaces'}
@@ -178,7 +178,7 @@ export const TenantsView: React.FC = () => {
             </div>
 
             {filteredTenants.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 space-y-2">
+              <div className="p-8 sm:p-12 text-center text-slate-500 space-y-2">
                 <Building2 className="w-8 h-8 mx-auto text-slate-600" />
                 <p className="text-slate-300 font-medium">No tenants found</p>
                 <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
@@ -186,8 +186,8 @@ export const TenantsView: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-left border-collapse min-w-[500px] sm:min-w-0">
                   <thead>
                     <tr className="border-b border-slate-800 bg-[#0e1422] text-[10px] uppercase text-slate-400">
                       <th className="p-3">Tenant Workspace</th>
@@ -209,20 +209,20 @@ export const TenantsView: React.FC = () => {
                           }`}
                         >
                           <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-slate-200 font-bold block">{t.name}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-slate-200 font-bold block break-words">{t.name}</span>
                               {isActive && (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shrink-0">
                                   ACTIVE
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-cyan-400 select-all block mt-0.5">
+                            <span className="text-[10px] text-cyan-400 select-all block mt-0.5 break-all">
                               {t.id}
                             </span>
                           </td>
                           <td className="p-3">
-                            <span className="text-[10px] text-purple-300 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20">
+                            <span className="text-[10px] text-purple-300 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 whitespace-nowrap">
                               {t.tier}
                             </span>
                           </td>
@@ -231,7 +231,7 @@ export const TenantsView: React.FC = () => {
                               {t.status}
                             </span>
                           </td>
-                          <td className="p-3 text-right">
+                          <td className="p-3 text-right whitespace-nowrap">
                             {isActive ? (
                               <span className="text-[10px] text-cyan-400 font-bold">
                                 Current
@@ -242,7 +242,7 @@ export const TenantsView: React.FC = () => {
                                   e.stopPropagation();
                                   handleSelectActive(t.id);
                                 }}
-                                className="text-[10px] text-slate-400 hover:text-white underline"
+                                className="text-[10px] text-slate-400 hover:text-white underline p-1 min-h-[36px] sm:min-h-0 inline-flex items-center cursor-pointer"
                               >
                                 Switch
                               </button>
@@ -259,17 +259,17 @@ export const TenantsView: React.FC = () => {
         </div>
 
         {/* Right Column: Tenant Detail Inspector */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 space-y-4 w-full">
           {selectedTenant ? (
-            <div className="p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4">
-              <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div className="p-4 sm:p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4">
+              <div className="border-b border-slate-800 pb-3 flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <h3 className="font-bold text-white text-sm uppercase">Tenant Workspace</h3>
-                  <span className="text-[10px] text-cyan-400 select-all">
+                  <h3 className="font-bold text-white text-xs sm:text-sm uppercase">Tenant Workspace</h3>
+                  <span className="text-[10px] text-cyan-400 select-all break-all">
                     {selectedTenant.id}
                   </span>
                 </div>
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
                   {selectedTenant.status}
                 </span>
               </div>
@@ -280,19 +280,19 @@ export const TenantsView: React.FC = () => {
                   Identity & Tier
                 </div>
                 <div className="p-3 rounded-lg bg-[#0e1422] border border-slate-800 space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Workspace Label:</span>
-                    <strong className="text-slate-200">{selectedTenant.name}</strong>
+                    <strong className="text-slate-200 text-right break-words">{selectedTenant.name}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Tenant Identifier:</span>
-                    <strong className="text-cyan-400 select-all">{selectedTenant.id}</strong>
+                    <strong className="text-cyan-400 select-all text-right break-all">{selectedTenant.id}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Assurance Tier:</span>
-                    <strong className="text-purple-300">{selectedTenant.tier}</strong>
+                    <strong className="text-purple-300 text-right">{selectedTenant.tier}</strong>
                   </div>
-                  <div className="pt-1 border-t border-slate-800 text-[11px] text-slate-300">
+                  <div className="pt-1 border-t border-slate-800 text-[11px] text-slate-300 break-words">
                     {selectedTenant.description}
                   </div>
                 </div>
@@ -307,7 +307,7 @@ export const TenantsView: React.FC = () => {
                   {selectedTenant.isolation_controls.map((ctrl, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-300">
                       <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span>{ctrl}</span>
+                      <span className="break-words">{ctrl}</span>
                     </div>
                   ))}
                 </div>
@@ -316,14 +316,14 @@ export const TenantsView: React.FC = () => {
               {/* Workspace Action */}
               <div className="pt-2 border-t border-slate-800 flex justify-end">
                 {tenantId === selectedTenant.id ? (
-                  <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1.5">
+                  <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1.5 min-h-[44px]">
                     <CheckCircle2 className="w-4 h-4" />
                     Active Workspace
                   </span>
                 ) : (
                   <button
                     onClick={() => handleSelectActive(selectedTenant.id)}
-                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="px-4 py-2.5 sm:py-2 min-h-[44px] sm:min-h-0 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer w-full sm:w-auto"
                   >
                     <Building2 className="w-3.5 h-3.5" />
                     <span>Set as Active Workspace</span>
@@ -332,7 +332,7 @@ export const TenantsView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto">
                 <Building2 className="w-5 h-5" />
               </div>

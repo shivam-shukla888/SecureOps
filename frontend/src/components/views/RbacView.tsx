@@ -182,25 +182,25 @@ export const RbacView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 select-none font-mono text-xs">
+    <div className="space-y-4 sm:space-y-6 select-none font-mono text-xs max-w-full">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold text-white tracking-tight uppercase">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2 border-b border-slate-800/80">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight uppercase truncate">
               USERS & ROLES
             </h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 shrink-0">
               RBAC IAM
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
             Manage identities, roles, and authorization boundaries across SecureOps.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[11px] text-slate-400">
+        <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-[10px] sm:text-[11px] text-slate-400">
             <span>
               Tenant: <strong className="text-slate-200">{tenantId}</strong>
             </span>
@@ -214,9 +214,9 @@ export const RbacView: React.FC = () => {
 
       {/* Role Hierarchy Cards */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <h3 className="text-xs font-semibold text-white uppercase flex items-center gap-2">
-            <Shield className="w-4 h-4 text-purple-400" />
+            <Shield className="w-4 h-4 text-purple-400 shrink-0" />
             <span>Role Hierarchy & Privilege Levels (5 Roles)</span>
           </h3>
           <span className="text-[10px] text-slate-500">
@@ -224,13 +224,13 @@ export const RbacView: React.FC = () => {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {ROLES_CATALOG.map((r) => {
             const isCurrent = userRole === r.role;
             return (
               <div
                 key={r.role}
-                className={`p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 ${
+                className={`p-3.5 sm:p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 ${
                   isCurrent
                     ? 'bg-purple-950/20 border-purple-500/50 shadow-md'
                     : 'bg-[#111827] border-slate-800/80 hover:border-slate-700'
@@ -247,20 +247,20 @@ export const RbacView: React.FC = () => {
                     </span>
                     <span className="text-[10px] text-slate-500">L{r.level}</span>
                   </div>
-                  <strong className="text-white text-xs block">{r.label}</strong>
-                  <p className="text-slate-400 text-[11px] font-sans leading-snug">{r.desc}</p>
+                  <strong className="text-white text-xs block break-words">{r.label}</strong>
+                  <p className="text-slate-400 text-[11px] font-sans leading-snug break-words">{r.desc}</p>
                 </div>
 
                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
                   {isCurrent ? (
-                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1 min-h-[36px] sm:min-h-0">
                       <CheckCircle2 className="w-3 h-3" />
                       ACTIVE ROLE
                     </span>
                   ) : (
                     <button
                       onClick={() => setUserRole(r.role)}
-                      className="text-[10px] text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 underline cursor-pointer min-h-[36px] sm:min-h-0 flex items-center"
                     >
                       Switch to {r.role}
                     </button>
@@ -273,10 +273,10 @@ export const RbacView: React.FC = () => {
       </div>
 
       {/* Permission Capability Matrix */}
-      <div className="rounded-xl bg-[#111827] border border-slate-800/80 overflow-hidden">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+      <div className="rounded-xl bg-[#111827] border border-slate-800/80 overflow-hidden max-w-full">
+        <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-cyan-400" />
+            <Lock className="w-4 h-4 text-cyan-400 shrink-0" />
             <h3 className="text-xs font-semibold text-white uppercase">
               Authoritative Permission Matrix
             </h3>
@@ -284,8 +284,8 @@ export const RbacView: React.FC = () => {
           <span className="text-[10px] text-slate-500">Server-Enforced RBAC Rules</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-[11px]">
+        <div className="overflow-x-auto max-w-full">
+          <table className="w-full text-left border-collapse text-[11px] min-w-[600px]">
             <thead>
               <tr className="border-b border-slate-800 bg-[#0e1422] text-[10px] uppercase text-slate-400">
                 <th className="p-3">Gateway Capability / Endpoint</th>
@@ -364,12 +364,13 @@ export const RbacView: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#111827] border border-slate-800 overflow-x-auto">
+        {/* Role Filter Pills (Horizontally scrollable) */}
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#111827] border border-slate-800 overflow-x-auto max-w-full custom-scrollbar">
           {['ALL', 'OWNER', 'ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER'].map((r) => (
             <button
               key={r}
               onClick={() => setRoleFilter(r)}
-              className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-2 sm:py-1 min-h-[44px] sm:min-h-0 rounded-md transition-colors cursor-pointer whitespace-nowrap flex items-center shrink-0 ${
                 roleFilter === r
                   ? 'bg-slate-800 text-white font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -382,20 +383,20 @@ export const RbacView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search user, name, role..."
-              className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-1.5 pl-8 pr-3 text-slate-200 focus:outline-none placeholder:text-slate-600"
+              className="w-full bg-[#111827] border border-slate-800 focus:border-cyan-500 rounded-lg py-2 sm:py-1.5 pl-8 pr-3 text-xs text-slate-200 focus:outline-none placeholder:text-slate-600 min-h-[44px] sm:min-h-0"
             />
           </div>
 
           {(roleFilter !== 'ALL' || searchTerm) && (
             <button
               onClick={handleResetFilters}
-              className="px-2.5 py-1.5 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+              className="px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-lg bg-[#111827] border border-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
               title="Reset active filters"
             >
               <RotateCcw className="w-3 h-3" />
@@ -405,12 +406,12 @@ export const RbacView: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid: User Table (7 cols) + Detail Inspector (5 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Grid: User Table (7 cols on lg) + Detail Inspector (5 cols on lg) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* Left Column: User Identities */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 w-full">
           <div className="rounded-xl bg-[#111827] border border-slate-800/80 overflow-hidden">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between">
               <span className="text-slate-400 font-medium">
                 {filteredUsers.length} Active {filteredUsers.length === 1 ? 'Identity' : 'Identities'}
               </span>
@@ -421,7 +422,7 @@ export const RbacView: React.FC = () => {
             </div>
 
             {filteredUsers.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 space-y-2">
+              <div className="p-8 sm:p-12 text-center text-slate-500 space-y-2">
                 <Users className="w-8 h-8 mx-auto text-slate-600" />
                 <p className="text-slate-300 font-medium">No users found</p>
                 <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
@@ -429,8 +430,8 @@ export const RbacView: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-left border-collapse min-w-[500px] sm:min-w-0">
                   <thead>
                     <tr className="border-b border-slate-800 bg-[#0e1422] text-[10px] uppercase text-slate-400">
                       <th className="p-3">Identity / User ID</th>
@@ -452,19 +453,19 @@ export const RbacView: React.FC = () => {
                           }`}
                         >
                           <td className="p-3">
-                            <span className="text-slate-200 font-bold block">{u.name}</span>
-                            <span className="text-[10px] text-cyan-400 select-all block">
+                            <span className="text-slate-200 font-bold block break-words">{u.name}</span>
+                            <span className="text-[10px] text-cyan-400 select-all block break-all">
                               {u.user_id}
                             </span>
                           </td>
                           <td className="p-3">
-                            <span className="text-[10px] text-slate-400 px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700">
+                            <span className="text-[10px] text-slate-400 px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700 whitespace-nowrap">
                               {u.service_type}
                             </span>
                           </td>
                           <td className="p-3">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getRoleBadgeStyle(
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${getRoleBadgeStyle(
                                 u.role
                               )}`}
                             >
@@ -490,18 +491,18 @@ export const RbacView: React.FC = () => {
         </div>
 
         {/* Right Column: User Detail Inspector */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 space-y-4 w-full">
           {selectedUser ? (
-            <div className="p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4">
-              <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div className="p-4 sm:p-5 rounded-xl bg-[#111827] border border-slate-800/80 space-y-4">
+              <div className="border-b border-slate-800 pb-3 flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <h3 className="font-bold text-white text-sm uppercase">Identity Context</h3>
-                  <span className="text-[10px] text-cyan-400 select-all">
+                  <h3 className="font-bold text-white text-xs sm:text-sm uppercase">Identity Context</h3>
+                  <span className="text-[10px] text-cyan-400 select-all break-all">
                     {selectedUser.user_id}
                   </span>
                 </div>
                 <span
-                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold border ${getRoleBadgeStyle(
+                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${getRoleBadgeStyle(
                     selectedUser.role
                   )}`}
                 >
@@ -515,27 +516,27 @@ export const RbacView: React.FC = () => {
                   Principal Information
                 </div>
                 <div className="p-3 rounded-lg bg-[#0e1422] border border-slate-800 space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Display Name:</span>
-                    <strong className="text-slate-200">{selectedUser.name}</strong>
+                    <strong className="text-slate-200 text-right break-words">{selectedUser.name}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">User ID:</span>
-                    <strong className="text-slate-200 select-all">{selectedUser.user_id}</strong>
+                    <strong className="text-slate-200 select-all text-right break-all">{selectedUser.user_id}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Tenant:</span>
-                    <strong className="text-slate-200">{selectedUser.tenant_id}</strong>
+                    <strong className="text-slate-200 text-right break-all">{selectedUser.tenant_id}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Principal Type:</span>
-                    <span className="text-cyan-300">{selectedUser.service_type}</span>
+                    <span className="text-cyan-300 text-right">{selectedUser.service_type}</span>
                   </div>
                 </div>
               </div>
 
               {/* Separation of Duties Notice */}
-              <div className="p-3.5 rounded-lg bg-[#0e1422] border border-slate-800 text-slate-400 text-xs flex items-start gap-2.5">
+              <div className="p-3 sm:p-3.5 rounded-lg bg-[#0e1422] border border-slate-800 text-slate-400 text-xs flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                 <div className="text-[11px] leading-relaxed">
                   <strong className="text-slate-200 block mb-0.5">
@@ -546,7 +547,7 @@ export const RbacView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#111827] border border-slate-800/80 text-center space-y-3">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 mx-auto">
                 <Users className="w-5 h-5" />
               </div>

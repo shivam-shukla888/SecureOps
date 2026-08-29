@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -30,6 +30,13 @@ const ViewLoadingFallback: React.FC = () => (
 
 export const App: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
+  const location = useLocation();
+
+  // Close mobile navigation drawer whenever the active route changes
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   if (!isAuthenticated) {
     return (
@@ -40,11 +47,14 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#090d16]">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1 p-6 overflow-y-auto">
+    <div className="flex min-h-dvh bg-[#090d16] overflow-x-hidden text-slate-100">
+      <Sidebar
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
+      />
+      <div className="flex-1 flex flex-col min-w-0 max-w-full">
+        <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} />
+        <main className="flex-1 p-3 sm:p-4 md:p-5 lg:p-6 overflow-y-auto overflow-x-hidden min-w-0 max-w-full">
           <Suspense fallback={<ViewLoadingFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
