@@ -97,36 +97,7 @@ async function request<T>(path: string, options: RequestInit = {}, apiKey?: stri
 }
 
 export const api = {
-  getHealth: async (): Promise<HealthResponse> => {
-    const baseUrl = getApiBaseUrl();
-    const url = `${baseUrl}/health`;
-    try {
-      const data = await request<HealthResponse>('/health');
-      if (typeof window !== 'undefined') {
-        console.log(
-          '[SecureOps Health Debug]\n' +
-            `requested URL: ${url}\n` +
-            `HTTP status: 200\n` +
-            `response body: ${JSON.stringify(data)}\n` +
-            `parsed status: ${data?.status}\n` +
-            `error: null`
-        );
-      }
-      return data;
-    } catch (err: any) {
-      if (typeof window !== 'undefined') {
-        console.error(
-          '[SecureOps Health Debug]\n' +
-            `requested URL: ${url}\n` +
-            `HTTP status: ${err?.statusCode || 'failed'}\n` +
-            `response body: ${JSON.stringify(err?.data || null)}\n` +
-            `parsed status: null\n` +
-            `error: ${err?.message || String(err)}`
-        );
-      }
-      throw err;
-    }
-  },
+  getHealth: () => request<HealthResponse>('/health'),
   getReady: () => request<ReadinessResponse>('/ready'),
 
   processRequest: (userId: string, reqText: string, apiKey?: string) =>
