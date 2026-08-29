@@ -43,19 +43,29 @@ export class APIError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}, apiKey?: string): Promise<T> {
+  const isPublicRootEndpoint = path === '/health' || path === '/ready' || path === 'health' || path === 'ready';
+
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    'Accept': 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
-  const rawToken = apiKey || sessionStorage.getItem('secureops_session_key') || '';
-  if (rawToken) {
-    // Strip any accidental duplicate Bearer/bearer prefixes or surrounding quotes
-    let cleanToken = rawToken.trim().replace(/['"]/g, '');
-    while (cleanToken.toLowerCase().startsWith('bearer ')) {
-      cleanToken = cleanToken.substring(7).trim();
+  // Only attach Content-Type if there is a request body (e.g. POST/PUT/PATCH)
+  if (options.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  // Only attach Authorization header if not a public probe (/health or /ready)
+  if (!isPublicRootEndpoint) {
+    const rawToken = apiKey || sessionStorage.getItem('secureops_session_key') || '';
+    if (rawToken) {
+      // Strip any accidental duplicate Bearer/bearer prefixes or surrounding quotes
+      let cleanToken = rawToken.trim().replace(/['"]/g, '');
+      while (cleanToken.toLowerCase().startsWith('bearer ')) {
+        cleanToken = cleanToken.substring(7).trim();
+      }
+      headers['Authorization'] = `Bearer ${cleanToken}`;
     }
-    headers['Authorization'] = `Bearer ${cleanToken}`;
   }
 
   const baseUrl = getApiBaseUrl();

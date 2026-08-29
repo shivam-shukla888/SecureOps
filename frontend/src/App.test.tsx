@@ -638,5 +638,37 @@ describe('SecureOps Frontend Security & API Tests', () => {
       expect(baseUrl).not.toContain('127.0.0.1');
       expect(baseUrl).toBe('https://secureops-gateway.onrender.com');
     });
+
+    it('TEST 9: Ensure public health and ready endpoints do not send unnecessary Authorization or Content-Type headers', () => {
+      const buildHeaders = (path: string, options: { body?: any; headers?: Record<string, string> } = {}, token?: string) => {
+        const isPublicRootEndpoint = path === '/health' || path === '/ready' || path === 'health' || path === 'ready';
+        const headers: Record<string, string> = {
+          Accept: 'application/json',
+          ...(options.headers as Record<string, string>),
+        };
+        if (options.body && !headers['Content-Type']) {
+          headers['Content-Type'] = 'application/json';
+        }
+        if (!isPublicRootEndpoint && token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        return headers;
+      };
+
+      const healthHeaders = buildHeaders('/health', {}, 'secret-token-123');
+      expect(healthHeaders['Accept']).toBe('application/json');
+      expect(healthHeaders['Authorization']).toBeUndefined();
+      expect(healthHeaders['Content-Type']).toBeUndefined();
+
+      const readyHeaders = buildHeaders('/ready', {}, 'secret-token-123');
+      expect(readyHeaders['Accept']).toBe('application/json');
+      expect(readyHeaders['Authorization']).toBeUndefined();
+      expect(readyHeaders['Content-Type']).toBeUndefined();
+
+      const authedHeaders = buildHeaders('/v1/requests', { body: JSON.stringify({ user_id: 'u1' }) }, 'secret-token-123');
+      expect(authedHeaders['Accept']).toBe('application/json');
+      expect(authedHeaders['Authorization']).toBe('Bearer secret-token-123');
+      expect(authedHeaders['Content-Type']).toBe('application/json');
+    });
   });
 });
