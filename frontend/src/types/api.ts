@@ -13,6 +13,7 @@ export interface ReadinessResponse {
   status: string;
   rate_limiter: string;
   database: string;
+  redis?: string;
   metrics_summary: Record<string, any>;
   timestamp: string;
 }

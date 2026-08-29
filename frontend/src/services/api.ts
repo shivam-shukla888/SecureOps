@@ -139,7 +139,18 @@ export const api = {
       body: JSON.stringify({ approver_id: approverId }),
     }),
 
-  listAuditEvents: (limit: number = 50) => request<AuditEventsResponse>(`/v1/audit/events?limit=${limit}`),
+  listAuditEvents: (params: { limit?: number; user_id?: string; request_id?: string; decision?: string } | number = 100) => {
+    if (typeof params === 'number') {
+      return request<AuditEventsResponse>(`/v1/audit/events?limit=${params}`);
+    }
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.user_id) query.set('user_id', params.user_id);
+    if (params?.request_id) query.set('request_id', params.request_id);
+    if (params?.decision && params.decision !== 'ALL') query.set('decision', params.decision);
+    const qStr = query.toString();
+    return request<AuditEventsResponse>(`/v1/audit/events${qStr ? `?${qStr}` : ''}`);
+  },
 
   listSecurityEvents: (limit: number = 50) => request<SecurityEventsResponse>(`/v1/security/events?limit=${limit}`),
 
